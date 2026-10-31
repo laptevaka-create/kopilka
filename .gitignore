@@ -1,0 +1,15 @@
+# сборка
+bin/
+obj/
+publish/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# локальная БД и временные файлы
+*.db
+*.db-wal
+*.db-shm
+build-docx/

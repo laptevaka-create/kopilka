@@ -1,0 +1,8 @@
+# в репозитории всегда LF; на Windows рабочая копия тоже LF
+* text=auto eol=lf
+
+# бинарные файлы не конвертировать
+*.docx binary
+*.png binary
+*.jpg binary
+*.db binary
