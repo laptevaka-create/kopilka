@@ -4,11 +4,20 @@
         Title="Копилка — учёт личных финансов"
         Width="900" Height="600"
         WindowStartupLocation="CenterScreen">
-    <Grid>
-        <TextBlock Text="Каркас приложения. Здесь появится журнал транзакций."
-                   HorizontalAlignment="Center"
-                   VerticalAlignment="Center"
-                   FontSize="16"
-                   Foreground="Gray" />
-    </Grid>
+    <DockPanel>
+        <Border DockPanel.Dock="Bottom"
+                Background="#F0F0F0"
+                Padding="8,4">
+            <TextBlock x:Name="DatabaseStatusText"
+                       FontSize="12"
+                       Foreground="Gray" />
+        </Border>
+        <Grid>
+            <TextBlock Text="Каркас приложения. Здесь появится журнал транзакций."
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       FontSize="16"
+                       Foreground="Gray" />
+        </Grid>
+    </DockPanel>
 </Window>

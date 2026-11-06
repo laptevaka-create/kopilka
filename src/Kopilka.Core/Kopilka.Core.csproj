@@ -10,4 +10,16 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- Единственная зависимость ядра: доступ к SQLite без Entity Framework.
+         DI и логирование живут в Kopilka.App, на уровне композиции. -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Миграции встраиваются в сборку: работают после публикации
+         на чистой машине, не зависят от внешних файлов. -->
+    <EmbeddedResource Include="Data\Migrations\*.sql" />
+  </ItemGroup>
+
 </Project>

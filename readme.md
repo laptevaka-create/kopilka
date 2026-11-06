@@ -80,7 +80,7 @@ C# + WPF + MVVM + SQLite, работа полностью локальная.
    сумма переводится только на выводе.
 5. **SQLite без EF.** `Microsoft.Data.Sqlite`, SQL-запросы пишутся напрямую.
    Схема версионируется через `PRAGMA user_version`, миграции —
-   SQL-файлы, встроенные в сборку.
+   SQL-файлы, встроенные в сборку Core.
 6. **MVVM свой.** `ViewModelBase` и `RelayCommand` написаны в проекте
    (~30 строк + ICommand), без сторонних MVVM-библиотек. Модели
    представления не знают про View и тестируются юнит-тестами без UI.
@@ -142,15 +142,17 @@ Kopilka.sln
 │   ├── Storage         AppPaths: %LOCALAPPDATA%\Kopilka, kopilka.db,
 │   │                   kopilka.demo.db
 │   ├── Domain          Account, Category, Transaction, Budget,
-│   │                   RecurringPayment, Setting          (шаг 1)
+│   │                   RecurringPayment, Setting, DeleteResult
 │   ├── Engines         BudgetEngine, RecurringEngine, CsvValidator,
 │   │                   BalanceEngine                       (шаги 4–6)
-│   └── Data            SqliteRepository, миграции через
-│                       PRAGMA user_version                (шаг 1)
+│   └── Data            SqliteDatabase, DatabaseMigrator (PRAGMA
+│                       user_version, миграции V###__*.sql в сборке),
+│                       репозитории счетов, категорий, транзакций
 │
 ├── src/Kopilka.App       (net10.0-windows — WPF, оболочка и композиция)
 │   ├── App.xaml.cs     DI-контейнер: регистрация сервисов Core,
-│   │                   выбор обычного или демо-режима (--demo)
+│   │                   выбор обычного или демо-режима (--demo),
+│   │                   открытие и миграция базы до показа окна
 │   └── Presentation    MainWindow, ViewModelBase, RelayCommand,
 │                       модели представления                 (шаг 2+)
 │
@@ -244,14 +246,15 @@ SQLite, файл `%LOCALAPPDATA%\Kopilka\kopilka.db`. Миграции — SQL-�
 от формата календарных типов.
 
 ```sql
--- V001 — начальная схема
+-- V001 — начальная схема и предустановленные справочники
 
--- Справочник счетов: «Наличные», «Карта», пользовательские
+-- Справочник счетов: «Наличные», «Карта», пользовательские.
+-- Счёт по умолчанию — не флаг здесь, а ключ в settings: один факт —
+-- одно место.
 CREATE TABLE accounts (
     id          INTEGER PRIMARY KEY,
     name        TEXT NOT NULL UNIQUE,
-    sort_order  INTEGER NOT NULL DEFAULT 0,
-    is_default  INTEGER NOT NULL DEFAULT 0
+    sort_order  INTEGER NOT NULL DEFAULT 0
 );
 
 -- Справочник категорий. kind: income | expense.
@@ -306,7 +309,22 @@ CREATE TABLE settings (
     key     TEXT PRIMARY KEY,
     value   TEXT NOT NULL
 );
+
+-- Предустановленные справочники (часть миграции V001)
+INSERT INTO accounts (id, name, sort_order) VALUES
+    (1, 'Наличные', 0),
+    (2, 'Карта', 1);
+
+INSERT INTO categories (id, name, kind, has_limit, sort_order) VALUES
+    (1, 'Зарплата',       'income',  0, 0),
+    (2, 'Прочие доходы',  'income',  0, 1),
+    (3, 'Продукты',       'expense', 0, 0),
+    (4, 'Транспорт',      'expense', 0, 1),
+    (5, 'Развлечения',    'expense', 0, 2),
+    (6, 'Прочие расходы', 'expense', 0, 3);
 ```
+
+Полная нормативная спецификация хранилища — [`docs/specs/data-model.md`](docs/specs/data-model.md).
 
 Как это используется:
 
@@ -456,22 +474,35 @@ Remove-Item "$env:LOCALAPPDATA\Kopilka\*.db*"
 
 ## Статус
 
-Сейчас: **шаг 0 выполнен**. Решение: `src/Kopilka.Core` (`net10.0`, без
+Сейчас: **шаг 1 выполнен**. Решение: `src/Kopilka.Core` (`net10.0`, без
 WPF и Windows-стеков, проверяется архитектурным тестом), `src/Kopilka.App`
 (`net10.0-windows`, WPF, `Kopilka.exe`), `tests/Kopilka.Core.Tests`
-(xunit, 10 тестов зелёные).
+(xunit, 42 теста зелёные).
 
 Шаг 0 дал: каркас решения из двух проектов; DI-композицию в точке входа
 (`Microsoft.Extensions.DependencyInjection`); источник времени `IClock`
 с реализацией `SystemClock` — движение к тестируемым на фиксированных
 датах движкам; `AppPaths` — пути `%LOCALAPPDATA%\Kopilka` с демо-режимом
-`kopilka.demo.db`; пустое главное окно с созданием каталога данных
-и честным сообщением при недоступном пути. Сборка 0 ошибок / 0
-предупреждений (`TreatWarningsAsErrors`), 10 юнит-тестов зелёные.
+`kopilka.demo.db`. Сборка 0 ошибок / 0 предупреждений
+(`TreatWarningsAsErrors`).
 
-Документация: `docs/tz.md` — техническое задание (сдано), этот `readme.md` —
-источник истины по скоупу. Спецификации `docs/specs/*` появятся вместе
-с соответствующими шагами.
+Шаг 1 дал: доменные записи (`Account`, `Category`, `Transaction`,
+`Budget`, `RecurringPayment`, `Setting`, `DeleteResult`); хранилище
+SQLite — `SqliteDatabase` (WAL, внешние ключи) и `DatabaseMigrator`
+(`PRAGMA user_version`, миграция `V001__init.sql` встроена в сборку Core,
+применяется в транзакции, идемпотентна); предустановленные справочники
+(счета «Наличные»/«Карта», шесть категорий) — часть миграции; репозитории
+счетов, категорий и транзакций за интерфейсами (`IAccountRepository`,
+`ICategoryRepository`, `ITransactionRepository`); запрет удаления
+используемых справочников (`DeleteResult.InUse`) — история неприкосновенна;
+база открывается и мигрируется до показа окна, при ошибке — сообщение
+и выход без стека. Проверено: сборка 0/0, 42 теста, живой прогон двух
+режимов (обычный и `--demo`) — файлы баз создаются, демо не трогает
+основную базу.
 
-Следующий шаг — **шаг 1**: доменные модели, SQLite-хранилище, миграции
-через `PRAGMA user_version`, репозиторий и его тесты.
+Документация: `docs/tz.md` — техническое задание (сдано); этот `readme.md`
+— источник истины по скоупу; `docs/specs/data-model.md` — нормативная
+спецификация хранилища. Спецификация правил движков появится на шаге 4.
+
+Следующий шаг — **шаг 2**: каркас MVVM (`ViewModelBase`, `RelayCommand`),
+окно журнала транзакций за месяц с итогами и диалог добавления.
