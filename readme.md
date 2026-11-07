@@ -127,10 +127,11 @@ Windows + .NET 10 (net10.0-windows) + WPF + MVVM + SQLite (Microsoft.Data.Sqlite
 Два проекта. Разделение — не косметика: один csproj делает правило
 «Core не знает про UI» проверяемым ограничением, а не комментарием.
 
-> Структура создана на шаге 0: `src/Kopilka.Core` (`net10.0`),
-> `src/Kopilka.App` (`net10.0-windows`, на выходе `Kopilka.exe`),
-> `tests/Kopilka.Core.Tests` (xunit). Решение — классический `Kopilka.sln`
-> (не `.slnx`, чтобы открывался любым Visual Studio и любым SDK).
+> Структура создана на шаге 0 и выросла к шагу 2: `src/Kopilka.Core`
+> (`net10.0`), `src/Kopilka.App` (`net10.0-windows`, на выходе
+> `Kopilka.exe`), `tests/Kopilka.Core.Tests` + `tests/Kopilka.App.Tests`
+> (xunit). Решение — классический `Kopilka.sln` (не `.slnx`, чтобы
+> открывался любым Visual Studio и любым SDK).
 
 ```text
 Kopilka.sln
@@ -153,11 +154,20 @@ Kopilka.sln
 │   ├── App.xaml.cs     DI-контейнер: регистрация сервисов Core,
 │   │                   выбор обычного или демо-режима (--demo),
 │   │                   открытие и миграция базы до показа окна
-│   └── Presentation    MainWindow, ViewModelBase, RelayCommand,
-│                       модели представления                 (шаг 2+)
+│   └── Presentation    ViewModelBase, RelayCommand, MoneyText,
+│                       MainViewModel (журнал месяца, итоги),
+│                       TransactionEditViewModel (диалог: валидация
+│                       и запись), TransactionRowViewModel,
+│                       IDialogService / WpfDialogService,
+│                       MainWindow, AddTransactionWindow
 │
-└── tests/Kopilka.Core.Tests  (net10.0, xunit; включая архитектурный тест,
-                               что Core не ссылается на Windows-стеки)
+└── tests/
+    ├── Kopilka.Core.Tests  (net10.0, xunit: хранилище и миграции,
+    │                        включая архитектурный тест, что Core
+    │                        не ссылается на Windows-стеки)
+    └── Kopilka.App.Tests   (net10.0-windows, xunit: модели
+                             представления без UI — репозитории
+                             и диалоги подменяются фейками)
 ```
 
 ### Направление зависимостей
@@ -474,10 +484,9 @@ Remove-Item "$env:LOCALAPPDATA\Kopilka\*.db*"
 
 ## Статус
 
-Сейчас: **шаг 1 выполнен**. Решение: `src/Kopilka.Core` (`net10.0`, без
-WPF и Windows-стеков, проверяется архитектурным тестом), `src/Kopilka.App`
-(`net10.0-windows`, WPF, `Kopilka.exe`), `tests/Kopilka.Core.Tests`
-(xunit, 42 теста зелёные).
+Сейчас: **шаг 2 выполнен**. Решение: `src/Kopilka.Core` (`net10.0`),
+`src/Kopilka.App` (`net10.0-windows`, WPF, `Kopilka.exe`), тесты — 143
+зелёных (68 Core + 75 App).
 
 Шаг 0 дал: каркас решения из двух проектов; DI-композицию в точке входа
 (`Microsoft.Extensions.DependencyInjection`); источник времени `IClock`
@@ -496,13 +505,35 @@ SQLite — `SqliteDatabase` (WAL, внешние ключи) и `DatabaseMigrato
 `ICategoryRepository`, `ITransactionRepository`); запрет удаления
 используемых справочников (`DeleteResult.InUse`) — история неприкосновенна;
 база открывается и мигрируется до показа окна, при ошибке — сообщение
-и выход без стека. Проверено: сборка 0/0, 42 теста, живой прогон двух
-режимов (обычный и `--demo`) — файлы баз создаются, демо не трогает
-основную базу.
+и выход без стека. Проверено: сборка 0/0, живой прогон двух режимов
+(обычный и `--demo`) — файлы баз создаются, демо не трогает основную базу.
+
+Шаг 2 дал: MVVM-каркас без сторонних библиотек — `ViewModelBase`
+(INotifyPropertyChanged) и `RelayCommand` (ICommand с явным
+`RaiseCanExecuteChanged`); `MainViewModel` — журнал выбранного месяца
+с навигацией «‹ ›», итогами (доходы, расходы, сальдо в копейках,
+перевод в рубли только на выводе через `MoneyText`);
+`TransactionEditViewModel` — диалог добавления с полной валидацией
+(пустые поля, не-число, неположительная и слишком большая сумма —
+отказ с причиной, ввод с точкой считается опечаткой запятой);
+`IDialogService`/`WpfDialogService` — окна через интерфейс, модели
+представления про View не знают; окна `MainWindow` (таблица журнала,
+цвета доходов/расходов) и `AddTransactionWindow`. Тесты моделей
+представления выполняются без UI на подменах репозиториев и диалогов —
+проект `tests/Kopilka.App.Tests` (net10.0-windows). Контрактная часть
+(делегированная и принятая после проверки): пустой месяц, месяцы только
+с доходами или расходами, отрицательное сальдо, февраль обычного
+и високосного года, многократная навигация через границы года, все 12
+русских заголовков, лояльность парсера сумм (пробелы внутри числа,
+ведущий плюс, округление «0,001»), границы `MoneyText` вплоть до
+`long.MaxValue`, команда с параметром. Проверено: сборка
+0/0, 143 теста, живой прогон: добавление транзакции видно в журнале
+без перезапуска (доказано тестом `AddTransaction_WhenDialogConfirmed_
+ReloadsList` и проверкой окна).
 
 Документация: `docs/tz.md` — техническое задание (сдано); этот `readme.md`
 — источник истины по скоупу; `docs/specs/data-model.md` — нормативная
 спецификация хранилища. Спецификация правил движков появится на шаге 4.
 
-Следующий шаг — **шаг 2**: каркас MVVM (`ViewModelBase`, `RelayCommand`),
-окно журнала транзакций за месяц с итогами и диалог добавления.
+Следующий шаг — **шаг 3**: управление категориями, фильтр журнала
+по категории и периоду, редактирование транзакций.

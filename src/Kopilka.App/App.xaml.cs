@@ -1,4 +1,5 @@
 using System.Windows;
+using Kopilka.App.Presentation;
 using Kopilka.Core.Data;
 using Kopilka.Core.Storage;
 using Kopilka.Core.Time;
@@ -56,9 +57,12 @@ public partial class App : Application
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton(paths);
         services.AddSingleton(database);
+        services.AddSingleton(database.Connection);
         services.AddSingleton<IAccountRepository, SqliteAccountRepository>();
         services.AddSingleton<ICategoryRepository, SqliteCategoryRepository>();
         services.AddSingleton<ITransactionRepository, SqliteTransactionRepository>();
+        services.AddSingleton<IDialogService, WpfDialogService>();
+        services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainWindow>();
         _services = services.BuildServiceProvider();
 

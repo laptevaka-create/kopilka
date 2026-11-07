@@ -2,22 +2,89 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Копилка — учёт личных финансов"
-        Width="900" Height="600"
+        Width="920" Height="620"
         WindowStartupLocation="CenterScreen">
     <DockPanel>
-        <Border DockPanel.Dock="Bottom"
-                Background="#F0F0F0"
-                Padding="8,4">
-            <TextBlock x:Name="DatabaseStatusText"
-                       FontSize="12"
-                       Foreground="Gray" />
+        <!-- Шапка: выбор месяца и добавление -->
+        <Border DockPanel.Dock="Top" Background="#F5F5F5" Padding="10,6">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button Content="Добавить"
+                            Command="{Binding AddTransactionCommand}"
+                            MinWidth="110" Padding="14,4" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <Button Content="‹" Command="{Binding PreviousMonthCommand}"
+                            Width="34" FontSize="16" Padding="0,2" />
+                    <TextBlock Text="{Binding MonthTitle}"
+                               FontSize="16" FontWeight="SemiBold"
+                               VerticalAlignment="Center"
+                               Margin="14,0" MinWidth="150"
+                               TextAlignment="Center" />
+                    <Button Content="›" Command="{Binding NextMonthCommand}"
+                            Width="34" FontSize="16" Padding="0,2" />
+                </StackPanel>
+            </DockPanel>
         </Border>
-        <Grid>
-            <TextBlock Text="Каркас приложения. Здесь появится журнал транзакций."
-                       HorizontalAlignment="Center"
-                       VerticalAlignment="Center"
-                       FontSize="16"
-                       Foreground="Gray" />
-        </Grid>
+
+        <!-- Итоги месяца -->
+        <Border DockPanel.Dock="Bottom" Background="#FAFAFA"
+                Padding="10,6" BorderBrush="#DDD" BorderThickness="0,1,0,0">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <TextBlock Text="Доходы:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                <TextBlock Text="{Binding IncomeText}" VerticalAlignment="Center"
+                           Foreground="#1E7B34" FontWeight="SemiBold" Margin="0,0,18,0" />
+                <TextBlock Text="Расходы:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                <TextBlock Text="{Binding ExpenseText}" VerticalAlignment="Center"
+                           Foreground="#B00020" FontWeight="SemiBold" Margin="0,0,18,0" />
+                <TextBlock Text="Сальдо:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                <TextBlock Text="{Binding BalanceText}" VerticalAlignment="Center"
+                           FontWeight="SemiBold" />
+            </StackPanel>
+        </Border>
+
+        <!-- Статус хранилища -->
+        <Border DockPanel.Dock="Bottom" Background="#F0F0F0" Padding="8,3">
+            <TextBlock x:Name="DatabaseStatusText" FontSize="12" Foreground="Gray" />
+        </Border>
+
+        <!-- Журнал -->
+        <DataGrid ItemsSource="{Binding Transactions}"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  IsReadOnly="True"
+                  HeadersVisibility="Column"
+                  GridLinesVisibility="Horizontal"
+                  BorderThickness="0"
+                  FontSize="13">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Дата" Binding="{Binding DisplayDate}" Width="110" />
+                <DataGridTextColumn Header="Счёт" Binding="{Binding AccountName}" Width="130" />
+                <DataGridTextColumn Header="Категория" Binding="{Binding CategoryName}" Width="170" />
+                <DataGridTextColumn Header="Комментарий" Binding="{Binding DisplayComment}" Width="*">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="Сумма" Binding="{Binding DisplayAmount}" Width="140">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="HorizontalAlignment" Value="Right" />
+                            <Setter Property="Margin" Value="0,0,8,0" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Kind}" Value="Income">
+                                    <Setter Property="Foreground" Value="#1E7B34" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Kind}" Value="Expense">
+                                    <Setter Property="Foreground" Value="#B00020" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+            </DataGrid.Columns>
+        </DataGrid>
     </DockPanel>
 </Window>
