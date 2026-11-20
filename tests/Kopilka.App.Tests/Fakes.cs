@@ -37,8 +37,8 @@ internal sealed class FakeAccountRepository : IAccountRepository
 {
     private readonly List<Account> _accounts = new()
     {
-        new Account(1, "Наличные", 0),
-        new Account(2, "Карта", 1),
+        new Account { Id = 1, Name = "Наличные", SortOrder = 0 },
+        new Account { Id = 2, Name = "Карта", SortOrder = 1 },
     };
 
     private long _nextId = 100;
@@ -49,7 +49,7 @@ internal sealed class FakeAccountRepository : IAccountRepository
 
     public long Add(string name, int sortOrder)
     {
-        var account = new Account(_nextId++, name, sortOrder);
+        var account = new Account { Id = _nextId++, Name = name, SortOrder = sortOrder };
         _accounts.Add(account);
         return account.Id;
     }
@@ -83,12 +83,12 @@ internal sealed class FakeCategoryRepository : ICategoryRepository
 {
     private readonly List<Category> _categories = new()
     {
-        new Category(1, "Зарплата", CategoryKind.Income, HasLimit: false, SortOrder: 0),
-        new Category(2, "Прочие доходы", CategoryKind.Income, HasLimit: false, SortOrder: 1),
-        new Category(3, "Продукты", CategoryKind.Expense, HasLimit: false, SortOrder: 0),
-        new Category(4, "Транспорт", CategoryKind.Expense, HasLimit: false, SortOrder: 1),
-        new Category(5, "Развлечения", CategoryKind.Expense, HasLimit: false, SortOrder: 2),
-        new Category(6, "Прочие расходы", CategoryKind.Expense, HasLimit: false, SortOrder: 3),
+        new Category { Id = 1, Name = "Зарплата", Kind = CategoryKind.Income, HasLimit = false, SortOrder = 0 },
+        new Category { Id = 2, Name = "Прочие доходы", Kind = CategoryKind.Income, HasLimit = false, SortOrder = 1 },
+        new Category { Id = 3, Name = "Продукты", Kind = CategoryKind.Expense, HasLimit = false, SortOrder = 0 },
+        new Category { Id = 4, Name = "Транспорт", Kind = CategoryKind.Expense, HasLimit = false, SortOrder = 1 },
+        new Category { Id = 5, Name = "Развлечения", Kind = CategoryKind.Expense, HasLimit = false, SortOrder = 2 },
+        new Category { Id = 6, Name = "Прочие расходы", Kind = CategoryKind.Expense, HasLimit = false, SortOrder = 3 },
     };
 
     private long _nextId = 100;
@@ -99,7 +99,7 @@ internal sealed class FakeCategoryRepository : ICategoryRepository
 
     public long Add(string name, CategoryKind kind, bool hasLimit, int sortOrder)
     {
-        var category = new Category(_nextId++, name, kind, hasLimit, sortOrder);
+        var category = new Category { Id = _nextId++, Name = name, Kind = kind, HasLimit = hasLimit, SortOrder = sortOrder };
         _categories.Add(category);
         return category.Id;
     }
@@ -138,7 +138,15 @@ internal sealed class FakeTransactionRepository : ITransactionRepository
 
     public long Add(long accountId, long categoryId, long amountKopecks, DateOnly date, string? comment)
     {
-        var transaction = new Transaction(_nextId++, accountId, categoryId, amountKopecks, date, comment);
+        var transaction = new Transaction
+        {
+            Id = _nextId++,
+            AccountId = accountId,
+            CategoryId = categoryId,
+            AmountKopecks = amountKopecks,
+            Date = date,
+            Comment = comment,
+        };
         _transactions.Add(transaction);
         return transaction.Id;
     }

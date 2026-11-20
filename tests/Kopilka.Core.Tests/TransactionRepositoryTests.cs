@@ -1,6 +1,6 @@
 using Kopilka.Core.Data;
 using Kopilka.Core.Domain;
-using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace Kopilka.Core.Tests;
@@ -15,36 +15,44 @@ public class TransactionRepositoryTests : IClassFixture<DatabaseFixture>
         _fixture.ResetToSeed();
     }
 
-    private SqliteTransactionRepository Repository => new(_fixture.Database.Connection);
+    private EfTransactionRepository Repository => new(_fixture.ContextFactory);
 
-    // Сид V001: счета 1 «Наличные», 2 «Карта»; категории 1 «Зарплата» (доход),
-    // 3 «Продукты» (расход), 4 «Транспорт» (расход). Идентификаторы фиксированы.
+    // Сид миграции: счета 1 «Наличные», 2 «Карта»; категории 1 «Зарплата»
+    // (доход), 3 «Продукты» (расход), 4 «Транспорт» (расход).
+    // Идентификаторы фиксированы.
 
     [Fact]
     public void Add_ReturnsId_AndGetByIdReturnsSameTransaction()
     {
-        var expected = new Transaction(0, 1, 3, 1_250, new DateOnly(2026, 1, 15), "хлеб и молоко");
-
-        long id = Repository.Add(expected.AccountId, expected.CategoryId, expected.AmountKopecks, expected.Date, expected.Comment);
+        long id = Repository.Add(
+            accountId: 1, categoryId: 3, amountKopecks: 1_250,
+            date: new DateOnly(2026, 1, 15), comment: "хлеб и молоко");
 
         Transaction? loaded = Repository.GetById(id);
 
         Assert.NotNull(loaded);
         Assert.Equal(id, loaded!.Id);
-        Assert.Equal(expected.AccountId, loaded.AccountId);
-        Assert.Equal(expected.CategoryId, loaded.CategoryId);
-        Assert.Equal(expected.AmountKopecks, loaded.AmountKopecks);
-        Assert.Equal(expected.Date, loaded.Date);
-        Assert.Equal(expected.Comment, loaded.Comment);
+        Assert.Equal(1, loaded.AccountId);
+        Assert.Equal(3, loaded.CategoryId);
+        Assert.Equal(1_250, loaded.AmountKopecks);
+        Assert.Equal(new DateOnly(2026, 1, 15), loaded.Date);
+        Assert.Equal("хлеб и молоко", loaded.Comment);
     }
 
     [Fact]
-    public void Add_NonPositiveAmount_IsRejectedBySchema()
+    public void Add_NonPositiveAmount_IsRejectedByCheckConstraint()
     {
-        Assert.Throws<SqliteException>(() =>
+        Assert.Throws<DbUpdateException>(() =>
             Repository.Add(1, 3, 0, new DateOnly(2026, 1, 1), null));
-        Assert.Throws<SqliteException>(() =>
+        Assert.Throws<DbUpdateException>(() =>
             Repository.Add(1, 3, -100, new DateOnly(2026, 1, 1), null));
+    }
+
+    [Fact]
+    public void Add_UnknownAccount_IsRejectedByForeignKey()
+    {
+        Assert.Throws<DbUpdateException>(() =>
+            Repository.Add(999, 3, 100, new DateOnly(2026, 1, 1), null));
     }
 
     [Fact]
@@ -113,7 +121,15 @@ public class TransactionRepositoryTests : IClassFixture<DatabaseFixture>
         var repository = Repository;
         long id = repository.Add(1, 3, 100, new DateOnly(2026, 3, 1), "было");
 
-        bool updated = repository.Update(new Transaction(id, 2, 4, 999, new DateOnly(2026, 3, 1), "стало"));
+        bool updated = repository.Update(new Transaction
+        {
+            Id = id,
+            AccountId = 2,
+            CategoryId = 4,
+            AmountKopecks = 999,
+            Date = new DateOnly(2026, 3, 1),
+            Comment = "стало",
+        });
 
         Assert.True(updated);
         Transaction? loaded = repository.GetById(id);
@@ -126,7 +142,15 @@ public class TransactionRepositoryTests : IClassFixture<DatabaseFixture>
     [Fact]
     public void Update_UnknownId_ReturnsFalse()
     {
-        bool updated = Repository.Update(new Transaction(9999, 1, 3, 100, new DateOnly(2026, 3, 1), null));
+        bool updated = Repository.Update(new Transaction
+        {
+            Id = 9999,
+            AccountId = 1,
+            CategoryId = 3,
+            AmountKopecks = 100,
+            Date = new DateOnly(2026, 3, 1),
+            Comment = null,
+        });
 
         Assert.False(updated);
     }

@@ -5,7 +5,14 @@ namespace Kopilka.Core.Domain;
 /// Счёт по умолчанию для новых транзакций хранится в настройках,
 /// а не флагом здесь: один факт — одно место.
 /// </summary>
-public sealed record Account(
-    long Id,
-    string Name,
-    int SortOrder);
+public sealed class Account
+{
+    /// <summary>Идентификатор счёта.</summary>
+    public long Id { get; set; }
+
+    /// <summary>Имя счёта, уникально.</summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>Порядок отображения в списках.</summary>
+    public int SortOrder { get; set; }
+}

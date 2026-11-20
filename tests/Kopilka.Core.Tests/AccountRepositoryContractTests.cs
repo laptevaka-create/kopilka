@@ -1,12 +1,12 @@
 using Kopilka.Core.Data;
 using Kopilka.Core.Domain;
-using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace Kopilka.Core.Tests;
 
 /// <summary>
-/// Контрактные тесты справочника счетов: ограничение UNIQUE на имя
+/// Контрактные тесты справочника счетов: ограничение уникальности имени
 /// (дубликат предустановленного и собственного имени, переименование
 /// в занятое имя), спецсимволы в имени и порядок выборки при равном
 /// sort_order.
@@ -21,36 +21,37 @@ public class AccountRepositoryContractTests : IClassFixture<DatabaseFixture>
         _fixture.ResetToSeed();
     }
 
-    private SqliteAccountRepository Repository => new(_fixture.Database.Connection);
+    private EfAccountRepository Repository => new(_fixture.ContextFactory);
 
-    // Сид V001: счёт 1 «Наличные» (sort_order 0), 2 «Карта» (sort_order 1).
+    // Сид миграции: счёт 1 «Наличные» (sort_order 0), 2 «Карта» (sort_order 1).
 
     [Fact]
-    public void Add_DuplicateOfPresetName_IsRejectedByUniqueConstraint()
+    public void Add_DuplicateOfPresetName_IsRejectedByUniqueIndex()
     {
-        Assert.Throws<SqliteException>(() => Repository.Add("Наличные", sortOrder: 0));
+        Assert.Throws<DbUpdateException>(() => Repository.Add("Наличные", sortOrder: 0));
 
         // Отказ не оставил следов: справочник не изменился.
         Assert.Equal(2, Repository.ListAll().Count);
     }
 
     [Fact]
-    public void Add_DuplicateOfOwnName_IsRejectedByUniqueConstraint()
+    public void Add_DuplicateOfOwnName_IsRejectedByUniqueIndex()
     {
         var repository = Repository;
         repository.Add("Депозит", sortOrder: 0);
 
-        Assert.Throws<SqliteException>(() => repository.Add("Депозит", sortOrder: 1));
+        Assert.Throws<DbUpdateException>(() => repository.Add("Депозит", sortOrder: 1));
     }
 
     [Fact]
-    public void Update_RenameToOccupiedName_IsRejectedByUniqueConstraint()
+    public void Update_RenameToOccupiedName_IsRejectedByUniqueIndex()
     {
         var repository = Repository;
         long first = repository.Add("Первый", sortOrder: 0);
         long second = repository.Add("Второй", sortOrder: 0);
 
-        Assert.Throws<SqliteException>(() => repository.Update(new Account(second, "Первый", 0)));
+        Assert.Throws<DbUpdateException>(() =>
+            repository.Update(new Account { Id = second, Name = "Первый", SortOrder = 0 }));
 
         // Имя второго счёта не изменилось, первый счёт на месте.
         Assert.Equal("Второй", repository.GetById(second)!.Name);

@@ -1,13 +1,14 @@
 using Kopilka.Core.Data;
 using Kopilka.Core.Domain;
 using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace Kopilka.Core.Tests;
 
 /// <summary>
 /// Контрактные тесты справочника категорий: несуществующие
-/// идентификаторы (GetById/Update/Delete), сохранение has_limit = 1,
+/// идентификаторы (GetById/Update/Delete), сохранение has_limit,
 /// дубликаты имён против предустановленных категорий, смена типа
 /// категории через Update и фактический порядок ListAll.
 /// </summary>
@@ -21,9 +22,9 @@ public class CategoryRepositoryContractTests : IClassFixture<DatabaseFixture>
         _fixture.ResetToSeed();
     }
 
-    private SqliteCategoryRepository Repository => new(_fixture.Database.Connection);
+    private EfCategoryRepository Repository => new(_fixture.ContextFactory);
 
-    // Сид V001: 1 «Зарплата», 2 «Прочие доходы» (доходы);
+    // Сид миграции: 1 «Зарплата», 2 «Прочие доходы» (доходы);
     // 3 «Продукты», 4 «Транспорт», 5 «Развлечения», 6 «Прочие расходы» (расходы).
 
     [Fact]
@@ -38,7 +39,7 @@ public class CategoryRepositoryContractTests : IClassFixture<DatabaseFixture>
     public void Update_UnknownId_ReturnsFalse()
     {
         bool updated = Repository.Update(
-            new Category(9999, "Несуществующая", CategoryKind.Expense, HasLimit: false, SortOrder: 0));
+            new Category { Id = 9999, Name = "Несуществующая", Kind = CategoryKind.Expense, HasLimit = false, SortOrder = 0 });
 
         Assert.False(updated);
     }
@@ -67,9 +68,9 @@ public class CategoryRepositoryContractTests : IClassFixture<DatabaseFixture>
     [Fact]
     public void Add_DuplicateOfPresetNameWithinSameKind_IsRejected()
     {
-        Assert.Throws<SqliteException>(() =>
+        Assert.Throws<DbUpdateException>(() =>
             Repository.Add("Продукты", CategoryKind.Expense, hasLimit: false, sortOrder: 0));
-        Assert.Throws<SqliteException>(() =>
+        Assert.Throws<DbUpdateException>(() =>
             Repository.Add("Зарплата", CategoryKind.Income, hasLimit: false, sortOrder: 0));
     }
 
@@ -93,7 +94,7 @@ public class CategoryRepositoryContractTests : IClassFixture<DatabaseFixture>
         long id = repository.Add("Подписки", CategoryKind.Expense, hasLimit: false, sortOrder: 0);
 
         bool updated = repository.Update(
-            new Category(id, "Подписки", CategoryKind.Income, HasLimit: false, SortOrder: 0));
+            new Category { Id = id, Name = "Подписки", Kind = CategoryKind.Income, HasLimit = false, SortOrder = 0 });
 
         Assert.True(updated);
         Assert.Equal(CategoryKind.Income, repository.GetById(id)!.Kind);
@@ -103,8 +104,9 @@ public class CategoryRepositoryContractTests : IClassFixture<DatabaseFixture>
     public void ListAll_OrdersByKindThenSortOrderThenName()
     {
         // Фактический порядок выборки: расходы раньше доходов
-        // ('expense' < 'income' в BINARY-коллации), внутри типа — по
-        // sort_order. Предустановленные sort_order: расходы 0..3, доходы 0..1.
+        // ('expense' < 'income' при текстовом хранении типа),
+        // внутри типа — по sort_order. Предустановленные sort_order:
+        // расходы 0..3, доходы 0..1.
         string[] names = Repository.ListAll().Select(c => c.Name).ToArray();
 
         Assert.Equal(
@@ -114,7 +116,14 @@ public class CategoryRepositoryContractTests : IClassFixture<DatabaseFixture>
 
     private long ReadRawHasLimit(long id)
     {
-        using var command = _fixture.Database.Connection.CreateCommand();
+        using KopilkaDbContext context = _fixture.ContextFactory.CreateDbContext();
+        var connection = (SqliteConnection)context.Database.GetDbConnection();
+        if (connection.State != System.Data.ConnectionState.Open)
+        {
+            connection.Open();
+        }
+
+        using var command = connection.CreateCommand();
         command.CommandText = "SELECT has_limit FROM categories WHERE id = @id;";
         command.Parameters.AddWithValue("@id", id);
 

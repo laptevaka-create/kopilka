@@ -21,9 +21,9 @@ public class TransactionRepositoryContractTests : IClassFixture<DatabaseFixture>
         _fixture.ResetToSeed();
     }
 
-    private SqliteTransactionRepository Repository => new(_fixture.Database.Connection);
+    private EfTransactionRepository Repository => new(_fixture.ContextFactory);
 
-    // Сид V001: счёт 1 «Наличные», 2 «Карта»; категории 3 «Продукты»,
+    // Сид миграции: счёт 1 «Наличные», 2 «Карта»; категории 3 «Продукты»,
     // 4 «Транспорт», 5 «Развлечения» (расходы). Идентификаторы фиксированы.
 
     [Fact]
@@ -186,8 +186,15 @@ public class TransactionRepositoryContractTests : IClassFixture<DatabaseFixture>
         long id = repository.Add(1, 3, 100, new DateOnly(2026, 3, 5), null);
         Assert.Null(repository.GetById(id)!.Comment);
 
-        bool updated = repository.Update(new Transaction(
-            id, 1, 3, 100, new DateOnly(2026, 3, 5), "теперь с комментарием"));
+        bool updated = repository.Update(new Transaction
+        {
+            Id = id,
+            AccountId = 1,
+            CategoryId = 3,
+            AmountKopecks = 100,
+            Date = new DateOnly(2026, 3, 5),
+            Comment = "теперь с комментарием",
+        });
 
         Assert.True(updated);
         Assert.Equal("теперь с комментарием", repository.GetById(id)!.Comment);
@@ -199,8 +206,15 @@ public class TransactionRepositoryContractTests : IClassFixture<DatabaseFixture>
         var repository = Repository;
         long id = repository.Add(1, 3, 100, new DateOnly(2026, 3, 5), "был комментарий");
 
-        bool updated = repository.Update(new Transaction(
-            id, 1, 3, 100, new DateOnly(2026, 3, 5), null));
+        bool updated = repository.Update(new Transaction
+        {
+            Id = id,
+            AccountId = 1,
+            CategoryId = 3,
+            AmountKopecks = 100,
+            Date = new DateOnly(2026, 3, 5),
+            Comment = null,
+        });
 
         Assert.True(updated);
         Assert.Null(repository.GetById(id)!.Comment);
@@ -213,8 +227,15 @@ public class TransactionRepositoryContractTests : IClassFixture<DatabaseFixture>
         long id = repository.Add(1, 3, 100, new DateOnly(2026, 3, 5), "старый");
         string special = "новый: «с кавычками»; и \"точкой с запятой\"; --";
 
-        bool updated = repository.Update(new Transaction(
-            id, 1, 3, 100, new DateOnly(2026, 3, 5), special));
+        bool updated = repository.Update(new Transaction
+        {
+            Id = id,
+            AccountId = 1,
+            CategoryId = 3,
+            AmountKopecks = 100,
+            Date = new DateOnly(2026, 3, 5),
+            Comment = special,
+        });
 
         Assert.True(updated);
         Assert.Equal(special, repository.GetById(id)!.Comment);

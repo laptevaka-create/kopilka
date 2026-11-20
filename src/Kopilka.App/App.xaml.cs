@@ -3,15 +3,17 @@ using Kopilka.App.Presentation;
 using Kopilka.Core.Data;
 using Kopilka.Core.Storage;
 using Kopilka.Core.Time;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Kopilka.App;
 
 /// <summary>
 /// Точка входа приложения. Здесь собирается контейнер зависимостей:
-/// источник времени, пути к данным, база SQLite и репозитории.
-/// База открывается и мигрируется до показа окна: первый запуск
-/// обязан закончиться готовой базой, а не пустым экраном.
+/// источник времени, пути к данным, фабрика контекста EF Core
+/// и репозитории. База создаётся и мигрируется до показа окна:
+/// первый запуск обязан закончиться готовой базой, а не пустым экраном.
 /// </summary>
 public partial class App : Application
 {
@@ -35,11 +37,20 @@ public partial class App : Application
             return;
         }
 
-        SqliteDatabase? database = null;
         try
         {
-            database = new SqliteDatabase(paths.DatabasePath);
-            new DatabaseMigrator(database.Connection).Migrate();
+            // WAL хранится в самом файле базы: включаем один раз,
+            // дальше режим переживает любые соединения (включая EF).
+            EnableWal(paths.DatabasePath);
+
+            // Создание схемы и применение миграций EF Core.
+            DbContextOptions<KopilkaDbContext> options = new DbContextOptionsBuilder<KopilkaDbContext>()
+                .UseSqlite($"Data Source={paths.DatabasePath}")
+                .Options;
+            using (var context = new KopilkaDbContext(options))
+            {
+                context.Database.Migrate();
+            }
         }
         catch (Exception ex)
         {
@@ -48,7 +59,6 @@ public partial class App : Application
                 "Копилка",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
-            database?.Dispose();
             Shutdown(-1);
             return;
         }
@@ -56,11 +66,11 @@ public partial class App : Application
         var services = new ServiceCollection();
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton(paths);
-        services.AddSingleton(database);
-        services.AddSingleton(database.Connection);
-        services.AddSingleton<IAccountRepository, SqliteAccountRepository>();
-        services.AddSingleton<ICategoryRepository, SqliteCategoryRepository>();
-        services.AddSingleton<ITransactionRepository, SqliteTransactionRepository>();
+        services.AddDbContextFactory<KopilkaDbContext>(options =>
+            options.UseSqlite($"Data Source={paths.DatabasePath}"));
+        services.AddSingleton<IAccountRepository, EfAccountRepository>();
+        services.AddSingleton<ICategoryRepository, EfCategoryRepository>();
+        services.AddSingleton<ITransactionRepository, EfTransactionRepository>();
         services.AddSingleton<IDialogService, WpfDialogService>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainWindow>();
@@ -75,5 +85,16 @@ public partial class App : Application
     {
         _services?.Dispose();
         base.OnExit(e);
+    }
+
+    /// <summary>Включает журнальный режим WAL: целостность базы при сбое питания.</summary>
+    private static void EnableWal(string databasePath)
+    {
+        using var connection = new SqliteConnection($"Data Source={databasePath}");
+        connection.Open();
+
+        using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA journal_mode = WAL;";
+        command.ExecuteNonQuery();
     }
 }

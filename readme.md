@@ -78,9 +78,11 @@ C# + WPF + MVVM + SQLite, работа полностью локальная.
 4. **Копейки — целым числом.** Все суммы хранятся в копейках (`long`).
    Ошибок плавающей точки при суммировании нет по построению; в рубли
    сумма переводится только на выводе.
-5. **SQLite без EF.** `Microsoft.Data.Sqlite`, SQL-запросы пишутся напрямую.
-   Схема версионируется через `PRAGMA user_version`, миграции —
-   SQL-файлы, встроенные в сборку Core.
+5. **EF Core поверх SQLite.** Доступ к базе — через Entity Framework
+   Core (`Microsoft.EntityFrameworkCore.Sqlite`): контекст `DbContext`,
+   сущности и LINQ-запросы; ручной SQL не пишется. Схема
+   версионируется миграциями EF Core, журнал — в таблице
+   `__EFMigrationsHistory` в самой базе.
 6. **MVVM свой.** `ViewModelBase` и `RelayCommand` написаны в проекте
    (~30 строк + ICommand), без сторонних MVVM-библиотек. Модели
    представления не знают про View и тестируются юнит-тестами без UI.
@@ -95,10 +97,12 @@ C# + WPF + MVVM + SQLite, работа полностью локальная.
 Стек MVP:
 
 ```text
-Windows + .NET 10 (net10.0-windows) + WPF + MVVM + SQLite (Microsoft.Data.Sqlite)
+Windows + .NET 10 (net10.0-windows) + WPF + MVVM + SQLite (Entity Framework Core)
 ```
 
-Сторонние пакеты исчерпываются списком: `Microsoft.Data.Sqlite`,
+Сторонние пакеты исчерпываются списком:
+`Microsoft.EntityFrameworkCore.Sqlite`,
+`Microsoft.EntityFrameworkCore.Design` (генерация миграций),
 `Microsoft.Extensions.DependencyInjection`, `Microsoft.Extensions.Logging`;
 в тестах — `xunit`. Прочих зависимостей нет и не планируется.
 
@@ -142,18 +146,20 @@ Kopilka.sln
 │   │                   тестируются на фиксированных датах)
 │   ├── Storage         AppPaths: %LOCALAPPDATA%\Kopilka, kopilka.db,
 │   │                   kopilka.demo.db
-│   ├── Domain          Account, Category, Transaction, Budget,
-│   │                   RecurringPayment, Setting, DeleteResult
+│   ├── Domain          сущности EF Core: Account, Category,
+│   │                   Transaction, Budget, RecurringPayment,
+│   │                   Setting, DeleteResult
 │   ├── Engines         BudgetEngine, RecurringEngine, CsvValidator,
 │   │                   BalanceEngine                       (шаги 4–6)
-│   └── Data            SqliteDatabase, DatabaseMigrator (PRAGMA
-│                       user_version, миграции V###__*.sql в сборке),
-│                       репозитории счетов, категорий, транзакций
+│   └── Data            KopilkaDbContext, конфигурации сущностей,
+│                       миграции EF Core (InitialCreate + журнал
+│                       __EFMigrationsHistory), фабрика контекста,
+│                       репозитории Ef*: счета, категории, транзакции
 │
 ├── src/Kopilka.App       (net10.0-windows — WPF, оболочка и композиция)
-│   ├── App.xaml.cs     DI-контейнер: регистрация сервисов Core,
-│   │                   выбор обычного или демо-режима (--demo),
-│   │                   открытие и миграция базы до показа окна
+│   ├── App.xaml.cs     DI-контейнер: регистрация фабрики контекста
+│   │                   и сервисов Core, выбор обычного или демо-режима
+│   │                   (--demo), применение миграций и WAL до окна
 │   └── Presentation    ViewModelBase, RelayCommand, MoneyText,
 │                       MainViewModel (журнал месяца, итоги),
 │                       TransactionEditViewModel (диалог: валидация
@@ -162,7 +168,8 @@ Kopilka.sln
 │                       MainWindow, AddTransactionWindow
 │
 └── tests/
-    ├── Kopilka.Core.Tests  (net10.0, xunit: хранилище и миграции,
+    ├── Kopilka.Core.Tests  (net10.0, xunit: схема и миграции EF,
+    │                        репозитории на реальной SQLite-базе,
     │                        включая архитектурный тест, что Core
     │                        не ссылается на Windows-стеки)
     └── Kopilka.App.Tests   (net10.0-windows, xunit: модели
@@ -250,43 +257,56 @@ Windows-стеков. Отсюда проверяемый тезис: **ядро
 
 ## Схема БД
 
-SQLite, файл `%LOCALAPPDATA%\Kopilka\kopilka.db`. Миграции — SQL-скрипты
-вручную через `PRAGMA user_version`, без EF. Даты хранятся строками ISO
-(`YYYY-MM-DD`) — читается глазами, сортируется как текст, не зависит
-от формата календарных типов.
+SQLite, файл `%LOCALAPPDATA%\Kopilka\kopilka.db`. Схема создаётся
+и версионируется миграциями EF Core (журнал — `__EFMigrationsHistory`);
+ниже — фактическая схема первой миграции `InitialCreate`. Даты хранятся
+строками ISO (`YYYY-MM-DD`) — читается глазами, сортируется как текст,
+не зависит от формата календарных типов.
 
 ```sql
--- V001 — начальная схема и предустановленные справочники
+-- InitialCreate — начальная схема и предустановленные справочники
+-- (создаётся миграцией EF Core, предустановленные записи — HasData).
+-- Ниже — фактическая DDL миграции: имена ограничений и индексов,
+-- ON DELETE RESTRICT на всех внешних ключах, AUTOINCREMENT на
+-- целочисленных ключах.
 
 -- Справочник счетов: «Наличные», «Карта», пользовательские.
 -- Счёт по умолчанию — не флаг здесь, а ключ в settings: один факт —
 -- одно место.
 CREATE TABLE accounts (
-    id          INTEGER PRIMARY KEY,
-    name        TEXT NOT NULL UNIQUE,
-    sort_order  INTEGER NOT NULL DEFAULT 0
+    id          INTEGER NOT NULL CONSTRAINT PK_accounts PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL,
+    sort_order  INTEGER NOT NULL
 );
+CREATE UNIQUE INDEX ix_accounts_name ON accounts (name);
 
 -- Справочник категорий. kind: income | expense.
 -- has_limit — по категории расхода задаётся месячный бюджет.
+-- 0/1 на булевых колонках гарантирует тип bool в модели: CHECK не ставится.
 CREATE TABLE categories (
-    id          INTEGER PRIMARY KEY,
+    id          INTEGER NOT NULL CONSTRAINT PK_categories PRIMARY KEY AUTOINCREMENT,
     name        TEXT NOT NULL,
-    kind        TEXT NOT NULL CHECK (kind IN ('income', 'expense')),
-    has_limit   INTEGER NOT NULL DEFAULT 0 CHECK (has_limit IN (0, 1)),
-    sort_order  INTEGER NOT NULL DEFAULT 0
+    kind        TEXT NOT NULL,
+    has_limit   INTEGER NOT NULL,
+    sort_order  INTEGER NOT NULL,
+    CONSTRAINT ck_categories_kind CHECK (kind IN ('income', 'expense'))
 );
 CREATE UNIQUE INDEX ix_categories_name_kind ON categories (kind, name);
 
 -- Транзакции. Сумма всегда положительная в копейках:
 -- направление задаётся типом категории, а не знаком числа.
 CREATE TABLE transactions (
-    id              INTEGER PRIMARY KEY,
-    account_id      INTEGER NOT NULL REFERENCES accounts (id),
-    category_id     INTEGER NOT NULL REFERENCES categories (id),
-    amount_kopecks  INTEGER NOT NULL CHECK (amount_kopecks > 0),
+    id              INTEGER NOT NULL CONSTRAINT PK_transactions PRIMARY KEY AUTOINCREMENT,
+    account_id      INTEGER NOT NULL,
+    category_id     INTEGER NOT NULL,
+    amount_kopecks  INTEGER NOT NULL,
     date            TEXT NOT NULL,        -- 'YYYY-MM-DD'
-    comment         TEXT
+    comment         TEXT NULL,
+    CONSTRAINT ck_transactions_amount_positive CHECK (amount_kopecks > 0),
+    CONSTRAINT FK_transactions_accounts_account_id
+        FOREIGN KEY (account_id) REFERENCES accounts (id) ON DELETE RESTRICT,
+    CONSTRAINT FK_transactions_categories_category_id
+        FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE RESTRICT
 );
 CREATE INDEX ix_transactions_date          ON transactions (date);
 CREATE INDEX ix_transactions_category_date ON transactions (category_id, date);
@@ -294,33 +314,45 @@ CREATE INDEX ix_transactions_account_date  ON transactions (account_id, date);
 
 -- Месячные бюджеты: одна строка на (категория, месяц)
 CREATE TABLE budgets (
-    id              INTEGER PRIMARY KEY,
-    category_id     INTEGER NOT NULL REFERENCES categories (id),
+    id              INTEGER NOT NULL CONSTRAINT PK_budgets PRIMARY KEY AUTOINCREMENT,
+    category_id     INTEGER NOT NULL,
     month           TEXT NOT NULL,        -- 'YYYY-MM'
-    limit_kopecks   INTEGER NOT NULL CHECK (limit_kopecks > 0),
-    UNIQUE (category_id, month)
+    limit_kopecks   INTEGER NOT NULL,
+    CONSTRAINT ck_budgets_limit_positive CHECK (limit_kopecks > 0),
+    CONSTRAINT FK_budgets_categories_category_id
+        FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE RESTRICT
 );
+CREATE UNIQUE INDEX ix_budgets_category_month ON budgets (category_id, month);
 
 -- Шаблоны регулярных платежей
 CREATE TABLE recurring (
-    id              INTEGER PRIMARY KEY,
-    category_id     INTEGER NOT NULL REFERENCES categories (id),
-    account_id      INTEGER NOT NULL REFERENCES accounts (id),
-    amount_kopecks  INTEGER NOT NULL CHECK (amount_kopecks > 0),
-    day_of_month    INTEGER NOT NULL CHECK (day_of_month BETWEEN 1 AND 31),
-    comment         TEXT,
-    is_active       INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
-    last_applied    TEXT                  -- 'YYYY-MM-DD', защита от дублей
+    id              INTEGER NOT NULL CONSTRAINT PK_recurring PRIMARY KEY AUTOINCREMENT,
+    category_id     INTEGER NOT NULL,
+    account_id      INTEGER NOT NULL,
+    amount_kopecks  INTEGER NOT NULL,
+    day_of_month    INTEGER NOT NULL,
+    comment         TEXT NULL,
+    is_active       INTEGER NOT NULL,
+    last_applied    TEXT NULL,            -- 'YYYY-MM-DD', защита от дублей
+    CONSTRAINT ck_recurring_amount_positive CHECK (amount_kopecks > 0),
+    CONSTRAINT ck_recurring_day_of_month CHECK (day_of_month BETWEEN 1 AND 31),
+    CONSTRAINT FK_recurring_accounts_account_id
+        FOREIGN KEY (account_id) REFERENCES accounts (id) ON DELETE RESTRICT,
+    CONSTRAINT FK_recurring_categories_category_id
+        FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE RESTRICT
 );
 CREATE INDEX ix_recurring_active ON recurring (is_active);
+-- Индексы по внешним ключам — конвенция EF: по ним база проверяет Restrict.
+CREATE INDEX IX_recurring_account_id  ON recurring (account_id);
+CREATE INDEX IX_recurring_category_id ON recurring (category_id);
 
 -- Настройки вида ключ—значение
 CREATE TABLE settings (
-    key     TEXT PRIMARY KEY,
+    key     TEXT NOT NULL CONSTRAINT PK_settings PRIMARY KEY,
     value   TEXT NOT NULL
 );
 
--- Предустановленные справочники (часть миграции V001)
+-- Предустановленные справочники (HasData в миграции InitialCreate)
 INSERT INTO accounts (id, name, sort_order) VALUES
     (1, 'Наличные', 0),
     (2, 'Карта', 1);
@@ -413,7 +445,7 @@ CSV и регулярные платежи — в конце: они опира�
 | # | Шаг | Критерий готовности |
 | --- | --- | --- |
 | 0 | **Каркас.** Два проекта, DI, `IClock`, `AppPaths`, пустое окно | Core собирается без `-windows`; сборка 0/0 |
-| 1 | **Домен + SQLite.** Модели, миграции `PRAGMA user_version`, репозиторий | БД создаётся первым запуском; тесты репозитория зелёные |
+| 1 | **Домен + SQLite + EF Core.** Сущности, `DbContext`, миграции EF, репозитории | БД создаётся первым запуском; тесты репозитория зелёные |
 | 2 | **MVVM + журнал.** `ViewModelBase`, `RelayCommand`, окно месяца, диалог добавления | Добавление видно в списке без перезапуска |
 | 3 | **Категории + фильтры.** Управление категориями, фильтр по категории/периоду, редактирование | Фильтр работает, итоги пересчитываются |
 | 4 | **Бюджеты.** `BudgetEngine`, панель статусов | Все ветки статуса покрыты тестами |
@@ -484,9 +516,10 @@ Remove-Item "$env:LOCALAPPDATA\Kopilka\*.db*"
 
 ## Статус
 
-Сейчас: **шаг 2 выполнен**. Решение: `src/Kopilka.Core` (`net10.0`),
-`src/Kopilka.App` (`net10.0-windows`, WPF, `Kopilka.exe`), тесты — 143
-зелёных (68 Core + 75 App).
+Сейчас: **шаг 2 выполнен** (включая перевод слоя данных на EF Core).
+Решение: `src/Kopilka.Core` (`net10.0`), `src/Kopilka.App`
+(`net10.0-windows`, WPF, `Kopilka.exe`), тесты — 155 зелёных
+(80 Core + 75 App).
 
 Шаг 0 дал: каркас решения из двух проектов; DI-композицию в точке входа
 (`Microsoft.Extensions.DependencyInjection`); источник времени `IClock`
@@ -497,16 +530,12 @@ Remove-Item "$env:LOCALAPPDATA\Kopilka\*.db*"
 
 Шаг 1 дал: доменные записи (`Account`, `Category`, `Transaction`,
 `Budget`, `RecurringPayment`, `Setting`, `DeleteResult`); хранилище
-SQLite — `SqliteDatabase` (WAL, внешние ключи) и `DatabaseMigrator`
-(`PRAGMA user_version`, миграция `V001__init.sql` встроена в сборку Core,
-применяется в транзакции, идемпотентна); предустановленные справочники
-(счета «Наличные»/«Карта», шесть категорий) — часть миграции; репозитории
-счетов, категорий и транзакций за интерфейсами (`IAccountRepository`,
-`ICategoryRepository`, `ITransactionRepository`); запрет удаления
-используемых справочников (`DeleteResult.InUse`) — история неприкосновенна;
-база открывается и мигрируется до показа окна, при ошибке — сообщение
-и выход без стека. Проверено: сборка 0/0, живой прогон двух режимов
-(обычный и `--demo`) — файлы баз создаются, демо не трогает основную базу.
+SQLite с миграциями и репозиториями за интерфейсами; запрет удаления
+используемых справочников (`DeleteResult.InUse`) — история
+неприкосновенна; база создаётся и готовится до показа окна, при ошибке —
+сообщение и выход без стека. Проверено: сборка 0/0, живой прогон двух
+режимов (обычный и `--demo`) — файлы баз создаются, демо не трогает
+основную базу.
 
 Шаг 2 дал: MVVM-каркас без сторонних библиотек — `ViewModelBase`
 (INotifyPropertyChanged) и `RelayCommand` (ICommand с явным
@@ -531,9 +560,38 @@ SQLite — `SqliteDatabase` (WAL, внешние ключи) и `DatabaseMigrato
 без перезапуска (доказано тестом `AddTransaction_WhenDialogConfirmed_
 ReloadsList` и проверкой окна).
 
-Документация: `docs/tz.md` — техническое задание (сдано); этот `readme.md`
-— источник истины по скоупу; `docs/specs/data-model.md` — нормативная
-спецификация хранилища. Спецификация правил движков появится на шаге 4.
+Перевод на EF Core (по замечанию руководителя к ТЗ) дал: контекст
+`KopilkaDbContext` с конфигурациями сущностей — прежняя схема сохранена
+по смыслу (те же таблицы и snake_case-колонки; ключевые CHECK на `kind`,
+суммах и дне месяца; `Restrict` на всех внешних ключах; уникальность
+`accounts.name` и `(category_id, month)` — именованными индексами;
+форму DDL см. в разделе «Схема базы»); сущности стали обычными классами
+EF; миграция `InitialCreate` (инструмент `dotnet ef`, журнал
+`__EFMigrationsHistory`), предустановленные справочники — `HasData`;
+WAL включается до миграций и хранится в файле базы; репозитории `Ef*`
+работают через фабрику контекста (`IDbContextFactory`) на LINQ,
+интерфейсы репозиториев не изменились — фейки в тестах VM не
+пострадали; тесты Core переведены на EF-базы (`DbUpdateException`
+вместо `SqliteException`). Контрактная часть (делегированная и принятая
+после проверки) закрепила поведение хранилища: WAL переживает миграции
+и EF-соединения; `Restrict` держит база, а не только код репозитория
+(raw-DELETE счёта с транзакциями, категории с транзакциями, бюджетом
+или шаблоном блокируется); `ResetToSeed` не плодит дубли; `DateOnly`
+круглится через 29 февраля; обе ветки конвертера `CategoryKind`;
+навигации требуют явного `Include`. Найденный при проверке латентный
+дефект закрыт сразу: `Delete` справочников теперь видит ссылки из
+`budgets` и `recurring`, а не только из `transactions`, и возвращает
+`DeleteResult.InUse` вместо необработанного `DbUpdateException`
+(проявилось бы на шагах 4 и 6). Проверено: сборка 0/0, 155 тестов
+(80 Core + 75 App), живой прогон обоих режимов: базы создаются
+миграцией EF с нуля (базы разработки до EF потребуют сброса локальной
+базы: `Remove-Item "$env:LOCALAPPDATA\Kopilka\*.db*"`).
+
+Документация: `docs/tz.md` — техническое задание (исправлено по
+замечаниям руководителя: раздел «Общие сведения», EF Core); этот
+`readme.md` — источник истины по скоупу; `docs/specs/data-model.md` —
+нормативная спецификация хранилища. Спецификация правил движков
+появится на шаге 4.
 
 Следующий шаг — **шаг 3**: управление категориями, фильтр журнала
 по категории и периоду, редактирование транзакций.

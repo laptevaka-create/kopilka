@@ -22,20 +22,23 @@ public class ArchitectureTests
     [Fact]
     public void AllProjects_UseOnlyAllowedPackages()
     {
-        // Пакетная дисциплина проекта: только SQLite, Microsoft.Extensions
-        // и xunit. Проверяется по всем csproj сразу — меньше шансов, что
-        // «одна маленькая библиотечка» просочится незамеченной.
+        // Пакетная дисциплина проекта: только EF Core (по требованию
+        // задания), Microsoft.Extensions и xunit. Проверяется по всем
+        // csproj сразу — меньше шансов, что «одна маленькая библиотечка»
+        // просочится незамеченной.
         string root = FindRepoRoot();
         string[] csprojs =
         {
             Path.Combine(root, "src", "Kopilka.Core", "Kopilka.Core.csproj"),
             Path.Combine(root, "src", "Kopilka.App", "Kopilka.App.csproj"),
             Path.Combine(root, "tests", "Kopilka.Core.Tests", "Kopilka.Core.Tests.csproj"),
+            Path.Combine(root, "tests", "Kopilka.App.Tests", "Kopilka.App.Tests.csproj"),
         };
 
         var allowed = new HashSet<string>(StringComparer.Ordinal)
         {
-            "Microsoft.Data.Sqlite",
+            "Microsoft.EntityFrameworkCore.Sqlite",
+            "Microsoft.EntityFrameworkCore.Design",
             "Microsoft.Extensions.DependencyInjection",
             "Microsoft.Extensions.Logging.Debug",
             "Microsoft.NET.Test.Sdk",

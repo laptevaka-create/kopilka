@@ -1,15 +1,15 @@
 using Kopilka.Core.Data;
-using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 
 namespace Kopilka.Core.Tests;
 
 /// <summary>
-/// Своя временная база для каждого тестового класса: миграция применяется
-/// один раз, тесты класса работают с изолированной копией.
+/// Своя временная база для каждого тестового класса: миграции EF Core
+/// применяются один раз, тесты класса работают с изолированной копией.
 /// </summary>
 public sealed class DatabaseFixture : IDisposable
 {
-    public SqliteDatabase Database { get; }
+    public IDbContextFactory<KopilkaDbContext> ContextFactory { get; }
 
     public string DatabasePath { get; }
 
@@ -21,14 +21,28 @@ public sealed class DatabaseFixture : IDisposable
         DatabasePath = Path.Combine(DataDirectory, "test.db");
         Directory.CreateDirectory(DataDirectory);
 
-        Database = new SqliteDatabase(DatabasePath);
-        new DatabaseMigrator(Database.Connection).Migrate();
+        ContextFactory = new SimpleDbContextFactory(DatabasePath);
+        using KopilkaDbContext context = ContextFactory.CreateDbContext();
+        context.Database.Migrate();
+    }
+
+    /// <summary>
+    /// Возвращает базу к состоянию сразу после миграции: транзакции
+    /// удалены, справочники — только предустановленные записи.
+    /// Вызывается перед каждым тестом: тесты не зависят от порядка
+    /// выполнения и от данных друг друга.
+    /// </summary>
+    public void ResetToSeed()
+    {
+        using KopilkaDbContext context = ContextFactory.CreateDbContext();
+        context.Transactions.RemoveRange(context.Transactions);
+        context.Accounts.RemoveRange(context.Accounts.Where(a => a.Id > 2));
+        context.Categories.RemoveRange(context.Categories.Where(c => c.Id > 6));
+        context.SaveChanges();
     }
 
     public void Dispose()
     {
-        Database.Dispose();
-
         // WAL создаёт рядом -wal и -shm файлы; чистим весь каталог.
         try
         {
@@ -41,23 +55,16 @@ public sealed class DatabaseFixture : IDisposable
         }
     }
 
-    /// <summary>
-    /// Возвращает базу к состоянию сразу после миграции: транзакции
-    /// удалены, справочники — только предустановленные записи.
-    /// Вызывается перед каждым тестом: тесты не зависят от порядка
-    /// выполнения и от данных друг друга.
-    /// </summary>
-    public void ResetToSeed()
+    /// <summary>Простая фабрика контекста для тестов: путь к базе фиксирован.</summary>
+    private sealed class SimpleDbContextFactory(string databasePath) : IDbContextFactory<KopilkaDbContext>
     {
-        Execute("DELETE FROM transactions;");
-        Execute("DELETE FROM accounts WHERE id > 2;");
-        Execute("DELETE FROM categories WHERE id > 6;");
-    }
+        public KopilkaDbContext CreateDbContext()
+        {
+            DbContextOptions<KopilkaDbContext> options = new DbContextOptionsBuilder<KopilkaDbContext>()
+                .UseSqlite($"Data Source={databasePath}")
+                .Options;
 
-    private void Execute(string sql)
-    {
-        using var command = Database.Connection.CreateCommand();
-        command.CommandText = sql;
-        command.ExecuteNonQuery();
+            return new KopilkaDbContext(options);
+        }
     }
 }
