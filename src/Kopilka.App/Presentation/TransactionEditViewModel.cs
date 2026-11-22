@@ -20,6 +20,8 @@ public sealed class TransactionEditViewModel : ViewModelBase
     private string _amountText = string.Empty;
     private string _commentText = string.Empty;
     private string _validationSummary = string.Empty;
+    private string _title = "Добавить транзакцию";
+    private long? _editingId;
 
     public TransactionEditViewModel(
         IAccountRepository accounts,
@@ -40,6 +42,16 @@ public sealed class TransactionEditViewModel : ViewModelBase
         SelectedAccount = Accounts.FirstOrDefault();
         SelectedDate = clock.Now.Date;
     }
+
+    /// <summary>Заголовок окна: зависит от режима (добавление/редактирование).</summary>
+    public string Title
+    {
+        get => _title;
+        private set => SetProperty(ref _title, value);
+    }
+
+    /// <summary>true, если диалог редактирует существующую транзакцию.</summary>
+    public bool IsEditing => _editingId is not null;
 
     /// <summary>Счета для выбора.</summary>
     public IReadOnlyList<AccountOption> Accounts { get; }
@@ -87,8 +99,29 @@ public sealed class TransactionEditViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Проверяет ввод и сохраняет транзакцию. Возвращает true при успехе;
-    /// при ошибках заполняет ValidationSummary и возвращает false.
+    /// Переводит диалог в режим редактирования: поля заполняются
+    /// значениями существующей транзакции, Save обновит её, а не
+    /// создаст новую.
+    /// </summary>
+    public void BeginEdit(Kopilka.Core.Domain.Transaction transaction)
+    {
+        _editingId = transaction.Id;
+        Title = "Изменить транзакцию";
+
+        SelectedAccount = Accounts.FirstOrDefault(a => a.Id == transaction.AccountId);
+        SelectedCategory = Categories.FirstOrDefault(c => c.Id == transaction.CategoryId);
+        SelectedDate = transaction.Date.ToDateTime(TimeOnly.MinValue);
+        // В поле ввода — сумма без символа валюты, как её вводит пользователь.
+        AmountText = (transaction.AmountKopecks / 100m).ToString("0.00", new CultureInfo("ru-RU"));
+        CommentText = transaction.Comment ?? string.Empty;
+        ValidationSummary = string.Empty;
+    }
+
+    /// <summary>
+    /// Проверяет ввод и сохраняет транзакцию: в режиме добавления создаёт
+    /// новую, в режиме редактирования обновляет существующую. Возвращает
+    /// true при успехе; при ошибках заполняет ValidationSummary и
+    /// возвращает false.
     /// </summary>
     public bool Save()
     {
@@ -99,12 +132,36 @@ public sealed class TransactionEditViewModel : ViewModelBase
             return false;
         }
 
-        _transactions.Add(
-            SelectedAccount!.Id,
-            SelectedCategory!.Id,
-            ParseAmount(AmountText),
-            DateOnly.FromDateTime(SelectedDate!.Value.Date),
-            string.IsNullOrWhiteSpace(CommentText) ? null : CommentText.Trim());
+        string? comment = string.IsNullOrWhiteSpace(CommentText) ? null : CommentText.Trim();
+        DateOnly date = DateOnly.FromDateTime(SelectedDate!.Value.Date);
+
+        if (_editingId is long id)
+        {
+            bool updated = _transactions.Update(new Kopilka.Core.Domain.Transaction
+            {
+                Id = id,
+                AccountId = SelectedAccount!.Id,
+                CategoryId = SelectedCategory!.Id,
+                AmountKopecks = ParseAmount(AmountText),
+                Date = date,
+                Comment = comment,
+            });
+            if (!updated)
+            {
+                // Транзакцию удалили, пока диалог был открыт.
+                ValidationSummary = "Транзакция уже удалена.";
+                return false;
+            }
+        }
+        else
+        {
+            _transactions.Add(
+                SelectedAccount!.Id,
+                SelectedCategory!.Id,
+                ParseAmount(AmountText),
+                date,
+                comment);
+        }
 
         // Успешная попытка закрывает предыдущие ошибки: сводка всегда
         // описывает последнюю попытку, а не всю историю ввода.

@@ -32,7 +32,7 @@ public class TransactionEditViewModelTests
         FakeTransactionRepository transactions = Fakes.Transactions();
         TransactionEditViewModel viewModel = Create(transactions);
         viewModel.SelectedAccount = viewModel.Accounts[1];       // «Карта»
-        viewModel.SelectedCategory = viewModel.Categories[2];    // «Продукты», расход
+        viewModel.SelectedCategory = viewModel.Categories[0];    // «Продукты», расход
         viewModel.SelectedDate = new DateTime(2026, 11, 6);
         viewModel.AmountText = "1 250,50";
         viewModel.CommentText = "  хлеб и молоко  ";
@@ -54,7 +54,7 @@ public class TransactionEditViewModelTests
     {
         FakeTransactionRepository transactions = Fakes.Transactions();
         TransactionEditViewModel viewModel = Create(transactions);
-        viewModel.SelectedCategory = viewModel.Categories[2];
+        viewModel.SelectedCategory = viewModel.Categories[0];
         viewModel.AmountText = "100";
 
         viewModel.Save();
@@ -67,7 +67,7 @@ public class TransactionEditViewModelTests
     {
         FakeTransactionRepository transactions = Fakes.Transactions();
         TransactionEditViewModel viewModel = Create(transactions);
-        viewModel.SelectedCategory = viewModel.Categories[2];
+        viewModel.SelectedCategory = viewModel.Categories[0];
         viewModel.AmountText = "100";
         viewModel.CommentText = "   ";
 
@@ -96,7 +96,7 @@ public class TransactionEditViewModelTests
     {
         TransactionEditViewModel viewModel = Create();
         viewModel.SelectedAccount = null;
-        viewModel.SelectedCategory = viewModel.Categories[2];
+        viewModel.SelectedCategory = viewModel.Categories[0];
         viewModel.AmountText = "100";
 
         bool saved = viewModel.Save();
@@ -109,7 +109,7 @@ public class TransactionEditViewModelTests
     public void Save_WithoutDate_ShowsError()
     {
         TransactionEditViewModel viewModel = Create();
-        viewModel.SelectedCategory = viewModel.Categories[2];
+        viewModel.SelectedCategory = viewModel.Categories[0];
         viewModel.SelectedDate = null;
         viewModel.AmountText = "100";
 
@@ -123,7 +123,7 @@ public class TransactionEditViewModelTests
     public void Save_EmptyAmount_ShowsError()
     {
         TransactionEditViewModel viewModel = Create();
-        viewModel.SelectedCategory = viewModel.Categories[2];
+        viewModel.SelectedCategory = viewModel.Categories[0];
         viewModel.AmountText = "  ";
 
         bool saved = viewModel.Save();
@@ -139,7 +139,7 @@ public class TransactionEditViewModelTests
     public void Save_NotANumber_ShowsError(string amount)
     {
         TransactionEditViewModel viewModel = Create();
-        viewModel.SelectedCategory = viewModel.Categories[2];
+        viewModel.SelectedCategory = viewModel.Categories[0];
         viewModel.AmountText = amount;
 
         bool saved = viewModel.Save();
@@ -155,7 +155,7 @@ public class TransactionEditViewModelTests
     public void Save_NonPositiveAmount_ShowsError(string amount)
     {
         TransactionEditViewModel viewModel = Create();
-        viewModel.SelectedCategory = viewModel.Categories[2];
+        viewModel.SelectedCategory = viewModel.Categories[0];
         viewModel.AmountText = amount;
 
         bool saved = viewModel.Save();
@@ -169,7 +169,7 @@ public class TransactionEditViewModelTests
     {
         FakeTransactionRepository transactions = Fakes.Transactions();
         TransactionEditViewModel viewModel = Create(transactions);
-        viewModel.SelectedCategory = viewModel.Categories[2];
+        viewModel.SelectedCategory = viewModel.Categories[0];
         viewModel.AmountText = "абв";
         Assert.False(viewModel.Save());
         Assert.NotEqual(string.Empty, viewModel.ValidationSummary);
@@ -187,7 +187,7 @@ public class TransactionEditViewModelTests
         // Сумма, не помещающаяся в long копеек: отказ с причиной,
         // а не переполнение при приведении типа.
         TransactionEditViewModel viewModel = Create();
-        viewModel.SelectedCategory = viewModel.Categories[2];
+        viewModel.SelectedCategory = viewModel.Categories[0];
         viewModel.AmountText = "99999999999999999999999";
 
         bool saved = viewModel.Save();
@@ -205,7 +205,7 @@ public class TransactionEditViewModelTests
     {
         FakeTransactionRepository transactions = Fakes.Transactions();
         TransactionEditViewModel viewModel = Create(transactions);
-        viewModel.SelectedCategory = viewModel.Categories[2];
+        viewModel.SelectedCategory = viewModel.Categories[0];
         viewModel.AmountText = amount;
 
         bool saved = viewModel.Save();
@@ -236,7 +236,7 @@ public class TransactionEditViewModelTests
     {
         TransactionEditViewModel viewModel = Create();
 
-        Assert.Equal("Зарплата (доход)", viewModel.Categories[0].Display);
-        Assert.Equal("Продукты (расход)", viewModel.Categories[2].Display);
+        Assert.Equal("Зарплата (доход)", viewModel.Categories.First(c => c.Name == "Зарплата").Display);
+        Assert.Equal("Продукты (расход)", viewModel.Categories.First(c => c.Name == "Продукты").Display);
     }
 }

@@ -93,7 +93,17 @@ internal sealed class FakeCategoryRepository : ICategoryRepository
 
     private long _nextId = 100;
 
-    public IReadOnlyList<Category> ListAll() => _categories;
+    /// <summary>Идентификаторы категорий, которые «используются»: Delete вернёт InUse.</summary>
+    public HashSet<long> InUseIds { get; } = new();
+
+    public IReadOnlyList<Category> ListAll() =>
+        // Контракт репозитория: сначала расходы, затем доходы;
+        // внутри типа — по sort_order, затем по имени.
+        _categories
+            .OrderBy(c => c.Kind == CategoryKind.Income)
+            .ThenBy(c => c.SortOrder)
+            .ThenBy(c => c.Name)
+            .ToList();
 
     public Category? GetById(long id) => _categories.FirstOrDefault(c => c.Id == id);
 
@@ -122,6 +132,11 @@ internal sealed class FakeCategoryRepository : ICategoryRepository
         if (category is null)
         {
             return DeleteResult.NotFound;
+        }
+
+        if (InUseIds.Contains(id))
+        {
+            return DeleteResult.InUse;
         }
 
         _categories.Remove(category);
@@ -186,14 +201,58 @@ internal sealed class FakeTransactionRepository : ITransactionRepository
     }
 }
 
-internal sealed class FakeDialogService(bool result) : IDialogService
+internal sealed class FakeDialogService : IDialogService
 {
-    /// <summary>Сколько раз диалог был показан.</summary>
+    private readonly bool _addResult;
+
+    public FakeDialogService(bool result)
+    {
+        _addResult = result;
+        EditResult = result;
+        ConfirmResult = result;
+    }
+    /// <summary>Сколько раз диалог добавления был показан.</summary>
     public int ShownCount { get; private set; }
+
+    /// <summary>Сколько раз диалог редактирования был показан.</summary>
+    public int EditShownCount { get; private set; }
+
+    /// <summary>Сколько раз открывалось окно категорий.</summary>
+    public int CategoriesShownCount { get; private set; }
+
+    /// <summary>Идентификатор последней транзакции, переданной в редактирование.</summary>
+    public long? LastEditId { get; private set; }
+
+    /// <summary>Результат диалога редактирования; по умолчанию — общий result.</summary>
+    public bool EditResult { get; set; }
+
+    /// <summary>Результат подтверждения; по умолчанию — общий result.</summary>
+    public bool ConfirmResult { get; set; }
+
+    /// <summary>Последний текст подтверждения.</summary>
+    public string? LastConfirmMessage { get; private set; }
 
     public bool ShowAddTransaction()
     {
         ShownCount++;
-        return result;
+        return _addResult;
+    }
+
+    public bool ShowEditTransaction(long transactionId)
+    {
+        EditShownCount++;
+        LastEditId = transactionId;
+        return EditResult;
+    }
+
+    public void ShowCategories()
+    {
+        CategoriesShownCount++;
+    }
+
+    public bool Confirm(string title, string message)
+    {
+        LastConfirmMessage = message;
+        return ConfirmResult;
     }
 }

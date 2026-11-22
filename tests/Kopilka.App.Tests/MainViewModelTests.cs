@@ -172,5 +172,13 @@ public class MainViewModelTests
             transactions.Add(1, 3, 100_50, new DateOnly(2026, 11, 10), "из диалога");
             return true;
         }
+
+        public bool ShowEditTransaction(long transactionId) => false;
+
+        public void ShowCategories()
+        {
+        }
+
+        public bool Confirm(string title, string message) => true;
     }
 }

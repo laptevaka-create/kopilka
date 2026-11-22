@@ -1,0 +1,77 @@
+<Window x:Class="Kopilka.App.CategoriesWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Категории"
+        Width="640" Height="480"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Список категорий -->
+        <ListBox ItemsSource="{Binding Categories}"
+                 SelectedItem="{Binding SelectedCategory}"
+                 DisplayMemberPath="Display"
+                 FontSize="13"
+                 Grid.Row="0" Grid.Column="0" Margin="0,0,16,0" />
+
+        <!-- Панель выбранной категории -->
+        <StackPanel Grid.Row="0" Grid.Column="1" Width="230">
+            <TextBlock Text="Выбранная категория" FontWeight="SemiBold" Margin="0,0,0,8" />
+            <TextBlock Text="Имя" Margin="0,0,0,4" />
+            <TextBox Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}"
+                     Margin="0,0,0,10" />
+            <TextBlock Margin="0,0,0,10" TextWrapping="Wrap" Foreground="Gray"
+                       Text="Тип задаётся при создании и дальше не меняется: смена типа переврала бы знак уже записанных транзакций." />
+            <CheckBox Content="Категория с лимитом (бюджет на месяц)"
+                      IsChecked="{Binding EditHasLimit}"
+                      IsEnabled="{Binding EditCanHaveLimit}"
+                      Margin="0,0,0,14" />
+            <Button Content="Сохранить изменения"
+                    Command="{Binding SaveChangesCommand}"
+                    Padding="10,4" Margin="0,0,0,8" />
+            <Button Content="Удалить"
+                    Command="{Binding DeleteCategoryCommand}"
+                    Padding="10,4" />
+        </StackPanel>
+
+        <!-- Ошибки -->
+        <TextBlock Text="{Binding ValidationSummary}"
+                   Foreground="#B00020"
+                   TextWrapping="Wrap"
+                   Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                   Margin="0,10,0,0" />
+
+        <!-- Новая категория -->
+        <Border Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
+                Margin="0,12,0,0" Padding="10"
+                BorderBrush="#DDD" BorderThickness="1" CornerRadius="4">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="Новая:" VerticalAlignment="Center" Margin="0,0,8,0" />
+                <TextBox Text="{Binding NewName, UpdateSourceTrigger=PropertyChanged}"
+                         Width="180" Margin="0,0,10,0" />
+                <RadioButton Content="расход" GroupName="NewKind"
+                             IsChecked="{Binding NewKindIsExpense}"
+                             VerticalAlignment="Center" Margin="0,0,8,0" />
+                <RadioButton Content="доход" GroupName="NewKind"
+                             IsChecked="{Binding NewKindIsIncome}"
+                             VerticalAlignment="Center" Margin="0,0,10,0" />
+                <CheckBox Content="лимит"
+                          IsChecked="{Binding NewHasLimit}"
+                          IsEnabled="{Binding NewCanSetLimit}"
+                          VerticalAlignment="Center" Margin="0,0,10,0" />
+                <Button Content="Добавить"
+                        Command="{Binding AddCategoryCommand}"
+                        Padding="14,4" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

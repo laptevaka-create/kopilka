@@ -14,7 +14,8 @@ public class TransactionEditContractTests
         new(Fakes.Accounts(), Fakes.Categories(), transactions, Fakes.Clock());
 
     // Сид фейков: счёт 1 «Наличные» (выбран по умолчанию),
-    // категория 3 «Продукты» (расход). Часы — 15 ноября 2026.
+    // категория 3 «Продукты» (расход; по контракту репозитория расходы
+    // идут первыми — поэтому индекс 0). Часы — 15 ноября 2026.
 
     [Fact]
     public void Save_AmountWithSpacesInsideDigits_IsAccepted()
@@ -23,7 +24,7 @@ public class TransactionEditContractTests
         // тысяч (парсер .NET принимает их): значение — 1250 рублей.
         FakeTransactionRepository transactions = Fakes.Transactions();
         TransactionEditViewModel viewModel = Create(transactions);
-        viewModel.SelectedCategory = viewModel.Categories[2];
+        viewModel.SelectedCategory = viewModel.Categories[0];
         viewModel.AmountText = "1 2 5 0";
 
         bool saved = viewModel.Save();
@@ -37,7 +38,7 @@ public class TransactionEditContractTests
     {
         FakeTransactionRepository transactions = Fakes.Transactions();
         TransactionEditViewModel viewModel = Create(transactions);
-        viewModel.SelectedCategory = viewModel.Categories[2];
+        viewModel.SelectedCategory = viewModel.Categories[0];
         viewModel.AmountText = "+100";
 
         bool saved = viewModel.Save();
@@ -53,7 +54,7 @@ public class TransactionEditContractTests
         // нулевых сумм не бывает — отказ с причиной.
         FakeTransactionRepository transactions = Fakes.Transactions();
         TransactionEditViewModel viewModel = Create(transactions);
-        viewModel.SelectedCategory = viewModel.Categories[2];
+        viewModel.SelectedCategory = viewModel.Categories[0];
         viewModel.AmountText = "0,001";
 
         bool saved = viewModel.Save();
@@ -68,7 +69,7 @@ public class TransactionEditContractTests
     {
         FakeTransactionRepository transactions = Fakes.Transactions();
         TransactionEditViewModel viewModel = Create(transactions);
-        viewModel.SelectedCategory = viewModel.Categories[2];
+        viewModel.SelectedCategory = viewModel.Categories[0];
         viewModel.AmountText = "абв";
 
         bool firstAttempt = viewModel.Save();
@@ -90,7 +91,7 @@ public class TransactionEditContractTests
     {
         FakeTransactionRepository transactions = Fakes.Transactions();
         TransactionEditViewModel viewModel = Create(transactions);
-        viewModel.SelectedCategory = viewModel.Categories[2];
+        viewModel.SelectedCategory = viewModel.Categories[0];
 
         viewModel.AmountText = "100";
         Assert.True(viewModel.Save());

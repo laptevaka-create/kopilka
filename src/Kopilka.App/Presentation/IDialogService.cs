@@ -11,4 +11,19 @@ public interface IDialogService
     /// если транзакция сохранена, false — если ввод отменён.
     /// </summary>
     bool ShowAddTransaction();
+
+    /// <summary>
+    /// Показывает диалог редактирования существующей транзакции.
+    /// Возвращает true, если изменения сохранены.
+    /// </summary>
+    bool ShowEditTransaction(long transactionId);
+
+    /// <summary>Показывает окно управления справочником категорий.</summary>
+    void ShowCategories();
+
+    /// <summary>
+    /// Спрашивает подтверждение действия. Возвращает true,
+    /// если пользователь ответил «Да».
+    /// </summary>
+    bool Confirm(string title, string message);
 }

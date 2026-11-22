@@ -20,4 +20,14 @@ public partial class MainWindow : Window
         string demoSuffix = paths.IsDemo ? " (демо-режим)" : string.Empty;
         DatabaseStatusText.Text = $"База данных: {paths.DatabasePath}{demoSuffix}";
     }
+
+    /// <summary>Двойной клик по строке журнала — редактирование транзакции.</summary>
+    private void OnTransactionDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (DataContext is MainViewModel viewModel
+            && viewModel.EditTransactionCommand.CanExecute(null))
+        {
+            viewModel.EditTransactionCommand.Execute(null);
+        }
+    }
 }
