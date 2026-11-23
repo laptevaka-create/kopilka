@@ -18,6 +18,7 @@ public class JournalFilterTests
             transactions,
             Fakes.Accounts(),
             Fakes.Categories(),
+            Fakes.Budgets(),
             dialog,
             Fakes.Clock());
         return (viewModel, transactions, dialog);

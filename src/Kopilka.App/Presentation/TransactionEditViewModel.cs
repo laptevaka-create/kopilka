@@ -194,7 +194,7 @@ public sealed class TransactionEditViewModel : ViewModelBase
         {
             errors.Add("Введите сумму.");
         }
-        else if (!TryParseAmount(amount, out long kopecks, out bool tooBig))
+        else if (!MoneyText.TryParseRubles(amount, out long kopecks, out bool tooBig))
         {
             if (tooBig)
             {
@@ -216,32 +216,8 @@ public sealed class TransactionEditViewModel : ViewModelBase
     /// <summary>Рубли с запятой или точкой → копейки; точка считается опечаткой запятой.</summary>
     private static long ParseAmount(string text)
     {
-        TryParseAmount(text, out long kopecks, out _);
+        MoneyText.TryParseRubles(text, out long kopecks, out _);
         return kopecks;
-    }
-
-    private static bool TryParseAmount(string text, out long kopecks, out bool tooBig)
-    {
-        tooBig = false;
-        string normalized = text.Trim().Replace('.', ',');
-        if (!decimal.TryParse(normalized, NumberStyles.Number, new CultureInfo("ru-RU"), out decimal rubles))
-        {
-            kopecks = 0;
-            return false;
-        }
-
-        decimal rounded = Math.Round(rubles * 100m, MidpointRounding.AwayFromZero);
-        if (rounded > long.MaxValue || rounded < long.MinValue)
-        {
-            // Столько копеек не помещается в long: транзакция с такой суммой
-            // невозможна, отказываем с причиной, а не падаем при приведении типа.
-            kopecks = 0;
-            tooBig = true;
-            return false;
-        }
-
-        kopecks = (long)rounded;
-        return true;
     }
 
     /// <summary>Вариант счёта для выпадающего списка.</summary>

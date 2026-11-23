@@ -23,6 +23,8 @@ internal static class Fakes
 
     public static FakeTransactionRepository Transactions() => new();
 
+    public static FakeBudgetRepository Budgets() => new();
+
     /// <summary>Сервис диалогов, всегда отвечающий заданным результатом.</summary>
     public static FakeDialogService Dialog(bool result) => new(result);
 }
@@ -85,7 +87,7 @@ internal sealed class FakeCategoryRepository : ICategoryRepository
     {
         new Category { Id = 1, Name = "Зарплата", Kind = CategoryKind.Income, HasLimit = false, SortOrder = 0 },
         new Category { Id = 2, Name = "Прочие доходы", Kind = CategoryKind.Income, HasLimit = false, SortOrder = 1 },
-        new Category { Id = 3, Name = "Продукты", Kind = CategoryKind.Expense, HasLimit = false, SortOrder = 0 },
+        new Category { Id = 3, Name = "Продукты", Kind = CategoryKind.Expense, HasLimit = true, SortOrder = 0 },
         new Category { Id = 4, Name = "Транспорт", Kind = CategoryKind.Expense, HasLimit = false, SortOrder = 1 },
         new Category { Id = 5, Name = "Развлечения", Kind = CategoryKind.Expense, HasLimit = false, SortOrder = 2 },
         new Category { Id = 6, Name = "Прочие расходы", Kind = CategoryKind.Expense, HasLimit = false, SortOrder = 3 },
@@ -176,6 +178,12 @@ internal sealed class FakeTransactionRepository : ITransactionRepository
             .ThenBy(t => t.Id)
             .ToList();
 
+    public IReadOnlyDictionary<long, long> SumByCategory(DateOnly from, DateOnly to) =>
+        _transactions
+            .Where(t => t.Date >= from && t.Date <= to)
+            .GroupBy(t => t.CategoryId)
+            .ToDictionary(g => g.Key, g => g.Sum(t => t.AmountKopecks));
+
     public bool Update(Transaction transaction)
     {
         int index = _transactions.FindIndex(t => t.Id == transaction.Id);
@@ -201,6 +209,52 @@ internal sealed class FakeTransactionRepository : ITransactionRepository
     }
 }
 
+internal sealed class FakeBudgetRepository : IBudgetRepository
+{
+    private readonly List<Budget> _budgets = new();
+    private long _nextId = 1;
+
+    public IReadOnlyList<Budget> ListByMonth(string month) =>
+        _budgets
+            .Where(b => b.Month == month)
+            .OrderBy(b => b.CategoryId)
+            .ToList();
+
+    public Budget? GetByCategoryAndMonth(long categoryId, string month) =>
+        _budgets.FirstOrDefault(b => b.CategoryId == categoryId && b.Month == month);
+
+    public void Set(long categoryId, string month, long limitKopecks)
+    {
+        Budget? existing = _budgets.FirstOrDefault(b => b.CategoryId == categoryId && b.Month == month);
+        if (existing is null)
+        {
+            _budgets.Add(new Budget
+            {
+                Id = _nextId++,
+                CategoryId = categoryId,
+                Month = month,
+                LimitKopecks = limitKopecks,
+            });
+        }
+        else
+        {
+            existing.LimitKopecks = limitKopecks;
+        }
+    }
+
+    public bool Remove(long categoryId, string month)
+    {
+        Budget? existing = _budgets.FirstOrDefault(b => b.CategoryId == categoryId && b.Month == month);
+        if (existing is null)
+        {
+            return false;
+        }
+
+        _budgets.Remove(existing);
+        return true;
+    }
+}
+
 internal sealed class FakeDialogService : IDialogService
 {
     private readonly bool _addResult;
@@ -219,6 +273,12 @@ internal sealed class FakeDialogService : IDialogService
 
     /// <summary>Сколько раз открывалось окно категорий.</summary>
     public int CategoriesShownCount { get; private set; }
+
+    /// <summary>Сколько раз открывалось окно бюджетов.</summary>
+    public int BudgetsShownCount { get; private set; }
+
+    /// <summary>Месяц, с которым последний раз открывали окно бюджетов.</summary>
+    public string? LastBudgetsMonth { get; private set; }
 
     /// <summary>Идентификатор последней транзакции, переданной в редактирование.</summary>
     public long? LastEditId { get; private set; }
@@ -248,6 +308,12 @@ internal sealed class FakeDialogService : IDialogService
     public void ShowCategories()
     {
         CategoriesShownCount++;
+    }
+
+    public void ShowBudgets(string month)
+    {
+        BudgetsShownCount++;
+        LastBudgetsMonth = month;
     }
 
     public bool Confirm(string title, string message)

@@ -18,6 +18,13 @@ public interface ITransactionRepository
     /// </summary>
     IReadOnlyList<Transaction> ListByPeriod(DateOnly from, DateOnly to, long? categoryId = null);
 
+    /// <summary>
+    /// Суммы по категориям за период [from, to] включительно:
+    /// ключ — идентификатор категории, значение — сумма в копейках.
+    /// Используется панелью бюджетов, поэтому фильтра журнала не имеет.
+    /// </summary>
+    IReadOnlyDictionary<long, long> SumByCategory(DateOnly from, DateOnly to);
+
     /// <summary>Заменяет транзакцию. Возвращает false, если её нет.</summary>
     bool Update(Transaction transaction);
 

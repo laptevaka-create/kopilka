@@ -36,6 +36,8 @@ public sealed class DatabaseFixture : IDisposable
     {
         using KopilkaDbContext context = ContextFactory.CreateDbContext();
         context.Transactions.RemoveRange(context.Transactions);
+        context.Budgets.RemoveRange(context.Budgets);
+        context.RecurringPayments.RemoveRange(context.RecurringPayments);
         context.Accounts.RemoveRange(context.Accounts.Where(a => a.Id > 2));
         context.Categories.RemoveRange(context.Categories.Where(c => c.Id > 6));
         context.SaveChanges();

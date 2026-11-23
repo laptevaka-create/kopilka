@@ -25,4 +25,34 @@ public static class MoneyText
         string sign = kind == CategoryKind.Income ? "+" : "−";
         return sign + Format(kopecks);
     }
+
+    /// <summary>
+    /// Разбор суммы, как её вводит пользователь: рубли с запятой
+    /// (точка считается опечаткой запятой), пробелы-разделители тысяч
+    /// допустимы. Возвращает false, если текст не число; tooBig —
+    /// если число не помещается в копейки long.
+    /// </summary>
+    public static bool TryParseRubles(string text, out long kopecks, out bool tooBig)
+    {
+        tooBig = false;
+        string normalized = text.Trim().Replace('.', ',');
+        if (!decimal.TryParse(normalized, NumberStyles.Number, Russian, out decimal rubles))
+        {
+            kopecks = 0;
+            return false;
+        }
+
+        decimal rounded = Math.Round(rubles * 100m, MidpointRounding.AwayFromZero);
+        if (rounded > long.MaxValue || rounded < long.MinValue)
+        {
+            // Столько копеек не помещается в long: отказ с причиной,
+            // а не падение при приведении типа.
+            kopecks = 0;
+            tooBig = true;
+            return false;
+        }
+
+        kopecks = (long)rounded;
+        return true;
+    }
 }

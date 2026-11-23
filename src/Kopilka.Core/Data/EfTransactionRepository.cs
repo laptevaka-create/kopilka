@@ -56,6 +56,17 @@ public sealed class EfTransactionRepository : ITransactionRepository
             .ToList();
     }
 
+    public IReadOnlyDictionary<long, long> SumByCategory(DateOnly from, DateOnly to)
+    {
+        using KopilkaDbContext context = _contextFactory.CreateDbContext();
+
+        return context.Transactions
+            .AsNoTracking()
+            .Where(t => t.Date >= from && t.Date <= to)
+            .GroupBy(t => t.CategoryId)
+            .ToDictionary(g => g.Key, g => g.Sum(t => t.AmountKopecks));
+    }
+
     public bool Update(Transaction transaction)
     {
         using KopilkaDbContext context = _contextFactory.CreateDbContext();

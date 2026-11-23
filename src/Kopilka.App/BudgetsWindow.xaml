@@ -1,0 +1,48 @@
+<Window x:Class="Kopilka.App.BudgetsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{Binding MonthTitle, StringFormat='Бюджеты — {0}'}"
+        Width="560" Height="420"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Категории с лимитом -->
+        <ListBox ItemsSource="{Binding Items}"
+                 SelectedItem="{Binding SelectedItem}"
+                 DisplayMemberPath="Display"
+                 FontSize="13"
+                 Grid.Row="0" Grid.Column="0" Margin="0,0,16,0" />
+
+        <!-- Лимит выбранной категории -->
+        <StackPanel Grid.Row="0" Grid.Column="1" Width="220">
+            <TextBlock Text="Лимит на месяц" FontWeight="SemiBold" Margin="0,0,0,8" />
+            <TextBlock Text="Сумма, ₽" Margin="0,0,0,4" />
+            <TextBox Text="{Binding LimitText, UpdateSourceTrigger=PropertyChanged}"
+                     Margin="0,0,0,12" />
+            <Button Content="Сохранить"
+                    Command="{Binding SaveLimitCommand}"
+                    Padding="10,4" Margin="0,0,0,8" />
+            <Button Content="Убрать лимит"
+                    Command="{Binding RemoveLimitCommand}"
+                    Padding="10,4" />
+            <TextBlock Margin="0,14,0,0" TextWrapping="Wrap" Foreground="Gray"
+                       Text="Бюджет задаётся на каждый месяц отдельно: лимит следующего месяца не наследуется." />
+        </StackPanel>
+
+        <!-- Ошибки -->
+        <TextBlock Text="{Binding ValidationSummary}"
+                   Foreground="#B00020"
+                   TextWrapping="Wrap"
+                   Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                   Margin="0,10,0,0" />
+    </Grid>
+</Window>

@@ -21,6 +21,9 @@ public interface IDialogService
     /// <summary>Показывает окно управления справочником категорий.</summary>
     void ShowCategories();
 
+    /// <summary>Показывает окно бюджетов на указанный месяц («ГГГГ-ММ»).</summary>
+    void ShowBudgets(string month);
+
     /// <summary>
     /// Спрашивает подтверждение действия. Возвращает true,
     /// если пользователь ответил «Да».

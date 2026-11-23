@@ -18,6 +18,7 @@ public class MainViewModelContractTests
             transactions,
             Fakes.Accounts(),
             Fakes.Categories(),
+            Fakes.Budgets(),
             Fakes.Dialog(result: false),
             Fakes.Clock(clockMoment));
         return (viewModel, transactions);

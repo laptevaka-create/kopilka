@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using Kopilka.Core.Data;
 using Kopilka.Core.Domain;
+using Kopilka.Core.Engines;
 using Kopilka.Core.Time;
 
 namespace Kopilka.App.Presentation;
@@ -20,6 +21,7 @@ public sealed class MainViewModel : ViewModelBase
     private readonly ITransactionRepository _transactions;
     private readonly IAccountRepository _accounts;
     private readonly ICategoryRepository _categories;
+    private readonly IBudgetRepository _budgets;
     private readonly IDialogService _dialogs;
     private readonly IClock _clock;
 
@@ -42,17 +44,20 @@ public sealed class MainViewModel : ViewModelBase
         ITransactionRepository transactions,
         IAccountRepository accounts,
         ICategoryRepository categories,
+        IBudgetRepository budgets,
         IDialogService dialogs,
         IClock clock)
     {
         _transactions = transactions;
         _accounts = accounts;
         _categories = categories;
+        _budgets = budgets;
         _dialogs = dialogs;
         _clock = clock;
 
         Transactions = new ObservableCollection<TransactionRowViewModel>();
         FilterCategories = new ObservableCollection<FilterCategoryOption>();
+        Budgets = new ObservableCollection<BudgetRowViewModel>();
 
         PreviousMonthCommand = new RelayCommand(GoToPreviousMonth, () => !IsCustomPeriod);
         NextMonthCommand = new RelayCommand(GoToNextMonth, () => !IsCustomPeriod);
@@ -60,6 +65,7 @@ public sealed class MainViewModel : ViewModelBase
         EditTransactionCommand = new RelayCommand(EditTransaction, () => SelectedTransaction is not null);
         DeleteTransactionCommand = new RelayCommand(DeleteTransaction, () => SelectedTransaction is not null);
         ShowCategoriesCommand = new RelayCommand(ShowCategories);
+        ShowBudgetsCommand = new RelayCommand(ShowBudgets, () => !IsCustomPeriod);
         ApplyPeriodCommand = new RelayCommand(ApplyPeriod);
         ResetPeriodCommand = new RelayCommand(ResetPeriod);
 
@@ -75,6 +81,18 @@ public sealed class MainViewModel : ViewModelBase
 
     /// <summary>Варианты фильтра по категории; первый — «Все категории».</summary>
     public ObservableCollection<FilterCategoryOption> FilterCategories { get; }
+
+    /// <summary>
+    /// Панель бюджетов выбранного месяца: категории с лимитом, лимит,
+    /// потрачено, остаток, «доступно в день», статус.
+    /// </summary>
+    public ObservableCollection<BudgetRowViewModel> Budgets { get; }
+
+    /// <summary>
+    /// Панель бюджетов видна только в режиме месяца: бюджет задан на
+    /// месяц, и к произвольному периоду он не привязан.
+    /// </summary>
+    public bool BudgetsVisible => !IsCustomPeriod;
 
     /// <summary>Заголовок периода: «Ноябрь 2026» или «Период: 05.11.2026 — 20.11.2026».</summary>
     public string MonthTitle
@@ -171,6 +189,8 @@ public sealed class MainViewModel : ViewModelBase
             {
                 PreviousMonthCommand.RaiseCanExecuteChanged();
                 NextMonthCommand.RaiseCanExecuteChanged();
+                ShowBudgetsCommand.RaiseCanExecuteChanged();
+                RaisePropertyChanged(nameof(BudgetsVisible));
             }
         }
     }
@@ -200,6 +220,8 @@ public sealed class MainViewModel : ViewModelBase
     public RelayCommand DeleteTransactionCommand { get; }
 
     public RelayCommand ShowCategoriesCommand { get; }
+
+    public RelayCommand ShowBudgetsCommand { get; }
 
     public RelayCommand ApplyPeriodCommand { get; }
 
@@ -259,6 +281,71 @@ public sealed class MainViewModel : ViewModelBase
         MonthTitle = IsCustomPeriod
             ? $"Период: {FormatDate(_periodFrom)} — {FormatDate(_periodTo)}"
             : TitleOf(_year, _month);
+
+        ReloadBudgets(from, to);
+    }
+
+    /// <summary>
+    /// Перечитывает панель бюджетов выбранного месяца. Потрачено
+    /// считается по всем транзакциям месяца, без фильтра журнала:
+    /// фильтр журнала — про просмотр, бюджет — про контроль.
+    /// </summary>
+    private void ReloadBudgets(DateOnly from, DateOnly to)
+    {
+        Budgets.Clear();
+        if (IsCustomPeriod)
+        {
+            return;
+        }
+
+        int daysInMonth = DateTime.DaysInMonth(_year, _month);
+        int currentDay = CurrentDayForShownMonth(daysInMonth);
+
+        Dictionary<long, long> budgetsByCategory = _budgets.ListByMonth(MonthKey())
+            .ToDictionary(b => b.CategoryId, b => b.LimitKopecks);
+        IReadOnlyDictionary<long, long> spentByCategory = _transactions.SumByCategory(from, to);
+
+        foreach (Category category in _categories.ListAll())
+        {
+            if (category.Kind != CategoryKind.Expense || !category.HasLimit)
+            {
+                continue;
+            }
+
+            bool hasBudget = budgetsByCategory.TryGetValue(category.Id, out long limit);
+            spentByCategory.TryGetValue(category.Id, out long spent);
+
+            BudgetSnapshot? snapshot = hasBudget
+                ? BudgetEngine.Compute(limit, spent, currentDay, daysInMonth)
+                : null;
+
+            Budgets.Add(new BudgetRowViewModel(
+                category.Id, category.Name, hasBudget,
+                hasBudget ? limit : 0, spent, snapshot));
+        }
+    }
+
+    /// <summary>
+    /// Ключ месяца для таблицы бюджетов: «2026-11».
+    /// </summary>
+    private string MonthKey() => $"{_year:D4}-{_month:D2}";
+
+    /// <summary>
+    /// Текущий день для формулы «доступно в день»: у текущего месяца —
+    /// сегодня; у прошлого — последний день (месяц весь прошёл); у
+    /// будущего — первый (месяц весь впереди).
+    /// </summary>
+    private int CurrentDayForShownMonth(int daysInMonth)
+    {
+        int shown = _year * 12 + _month;
+        int now = _clock.Now.Year * 12 + _clock.Now.Month;
+
+        if (shown == now)
+        {
+            return _clock.Now.Day;
+        }
+
+        return shown < now ? daysInMonth : 1;
     }
 
     private void GoToPreviousMonth()
@@ -335,6 +422,14 @@ public sealed class MainViewModel : ViewModelBase
             FilterCategories.FirstOrDefault(c => c.Id == selectedId)
             ?? FilterCategories[0],
             nameof(SelectedFilterCategory));
+        Reload();
+    }
+
+    private void ShowBudgets()
+    {
+        // Окно редактирует бюджеты показанного месяца; после закрытия
+        // панель перечитывается.
+        _dialogs.ShowBudgets(MonthKey());
         Reload();
     }
 
