@@ -82,9 +82,7 @@ public sealed class BudgetsViewModel : ViewModelBase
     {
         int year = int.Parse(_month[..4]);
         int month = int.Parse(_month[5..7]);
-        MonthTitle = new DateTime(year, month, 1)
-            .ToString("MMMM yyyy", new System.Globalization.CultureInfo("ru-RU"));
-        MonthTitle = char.ToUpper(MonthTitle[0]) + MonthTitle[1..];
+        MonthTitle = CalendarText.MonthTitle(year, month);
 
         Dictionary<long, long> budgetsByCategory = _budgets.ListByMonth(_month)
             .ToDictionary(b => b.CategoryId, b => b.LimitKopecks);

@@ -24,6 +24,21 @@ public interface IDialogService
     /// <summary>Показывает окно бюджетов на указанный месяц («ГГГГ-ММ»).</summary>
     void ShowBudgets(string month);
 
+    /// <summary>Показывает окно отчёта указанного месяца («ГГГГ-ММ»).</summary>
+    void ShowMonthReport(string month);
+
+    /// <summary>Спрашивает путь для файла экспорта CSV. null — отмена.</summary>
+    string? AskCsvExportPath(string monthKey);
+
+    /// <summary>Спрашивает путь файла для импорта CSV. null — отмена.</summary>
+    string? AskCsvImportPath();
+
+    /// <summary>Показывает окно с отчётом импорта CSV.</summary>
+    void ShowCsvImportReport(string report);
+
+    /// <summary>Показывает сообщение об ошибке операции.</summary>
+    void ShowError(string title, string message);
+
     /// <summary>
     /// Спрашивает подтверждение действия. Возвращает true,
     /// если пользователь ответил «Да».

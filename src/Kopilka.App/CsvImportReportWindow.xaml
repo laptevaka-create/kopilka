@@ -1,0 +1,19 @@
+<Window x:Class="Kopilka.App.CsvImportReportWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Импорт CSV"
+        Width="540" Height="360"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False">
+    <DockPanel Margin="16">
+        <Button DockPanel.Dock="Bottom" Content="Закрыть" IsCancel="True"
+                MinWidth="90" Padding="10,4" HorizontalAlignment="Right" Margin="0,12,0,0" />
+        <TextBox Text="{Binding Mode=OneWay}"
+                 IsReadOnly="True"
+                 TextWrapping="Wrap"
+                 FontSize="13"
+                 VerticalScrollBarVisibility="Auto"
+                 HorizontalScrollBarVisibility="Auto"
+                 Background="#FAFAFA" BorderThickness="1" BorderBrush="#DDD" Padding="8" />
+    </DockPanel>
+</Window>

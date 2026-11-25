@@ -1,9 +1,12 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.IO;
+using System.Text;
 using Kopilka.Core.Data;
 using Kopilka.Core.Domain;
 using Kopilka.Core.Engines;
 using Kopilka.Core.Time;
+using Microsoft.EntityFrameworkCore;
 
 namespace Kopilka.App.Presentation;
 
@@ -66,6 +69,9 @@ public sealed class MainViewModel : ViewModelBase
         DeleteTransactionCommand = new RelayCommand(DeleteTransaction, () => SelectedTransaction is not null);
         ShowCategoriesCommand = new RelayCommand(ShowCategories);
         ShowBudgetsCommand = new RelayCommand(ShowBudgets, () => !IsCustomPeriod);
+        ShowReportCommand = new RelayCommand(ShowMonthReport, () => !IsCustomPeriod);
+        ExportCsvCommand = new RelayCommand(ExportCsv, () => !IsCustomPeriod);
+        ImportCsvCommand = new RelayCommand(ImportCsv);
         ApplyPeriodCommand = new RelayCommand(ApplyPeriod);
         ResetPeriodCommand = new RelayCommand(ResetPeriod);
 
@@ -190,6 +196,8 @@ public sealed class MainViewModel : ViewModelBase
                 PreviousMonthCommand.RaiseCanExecuteChanged();
                 NextMonthCommand.RaiseCanExecuteChanged();
                 ShowBudgetsCommand.RaiseCanExecuteChanged();
+                ShowReportCommand.RaiseCanExecuteChanged();
+                ExportCsvCommand.RaiseCanExecuteChanged();
                 RaisePropertyChanged(nameof(BudgetsVisible));
             }
         }
@@ -222,6 +230,12 @@ public sealed class MainViewModel : ViewModelBase
     public RelayCommand ShowCategoriesCommand { get; }
 
     public RelayCommand ShowBudgetsCommand { get; }
+
+    public RelayCommand ShowReportCommand { get; }
+
+    public RelayCommand ExportCsvCommand { get; }
+
+    public RelayCommand ImportCsvCommand { get; }
 
     public RelayCommand ApplyPeriodCommand { get; }
 
@@ -279,8 +293,8 @@ public sealed class MainViewModel : ViewModelBase
         IncomeKopecks = income;
         ExpenseKopecks = expense;
         MonthTitle = IsCustomPeriod
-            ? $"Период: {FormatDate(_periodFrom)} — {FormatDate(_periodTo)}"
-            : TitleOf(_year, _month);
+            ? $"Период: {CalendarText.FormatDate(_periodFrom)} — {CalendarText.FormatDate(_periodTo)}"
+            : CalendarText.MonthTitle(_year, _month);
 
         ReloadBudgets(from, to);
     }
@@ -402,7 +416,7 @@ public sealed class MainViewModel : ViewModelBase
 
         bool confirmed = _dialogs.Confirm(
             "Удалить транзакцию",
-            $"Удалить транзакцию от {FormatDate(SelectedTransaction.Date)} " +
+            $"Удалить транзакцию от {CalendarText.FormatDate(SelectedTransaction.Date)} " +
             $"на {MoneyText.Format(SelectedTransaction.AmountKopecks)}?");
         if (confirmed && _transactions.Delete(SelectedTransaction.Id))
         {
@@ -430,6 +444,95 @@ public sealed class MainViewModel : ViewModelBase
         // Окно редактирует бюджеты показанного месяца; после закрытия
         // панель перечитывается.
         _dialogs.ShowBudgets(MonthKey());
+        Reload();
+    }
+
+    private void ShowMonthReport()
+    {
+        _dialogs.ShowMonthReport(MonthKey());
+    }
+
+    /// <summary>Экспорт транзакций показанного месяца в CSV-файл.</summary>
+    private void ExportCsv()
+    {
+        string? path = _dialogs.AskCsvExportPath(MonthKey());
+        if (path is null)
+        {
+            return; // отмена диалога — не ошибка
+        }
+
+        DateOnly from = new(_year, _month, 1);
+        DateOnly to = new(_year, _month, DateTime.DaysInMonth(_year, _month));
+
+        Dictionary<long, string> accountNames = _accounts.ListAll()
+            .ToDictionary(a => a.Id, a => a.Name);
+        Dictionary<long, string> categoryNames = _categories.ListAll()
+            .ToDictionary(c => c.Id, c => c.Name);
+
+        string csv = CsvExchange.BuildExportText(
+            _transactions.ListByPeriod(from, to), accountNames, categoryNames);
+
+        try
+        {
+            // BOM в UTF-8: Excel открывает кириллицу корректно;
+            // чтение метку снимает.
+            File.WriteAllText(path, csv, new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _dialogs.ShowError("Экспорт CSV", $"Не удалось записать файл:\n{path}\n\n{ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Импорт транзакций из CSV: построчная проверка, валидные строки
+    /// сохраняются, битые пропускаются с причиной; итог — отчёт.
+    /// </summary>
+    private void ImportCsv()
+    {
+        string? path = _dialogs.AskCsvImportPath();
+        if (path is null)
+        {
+            return; // отмена диалога — не ошибка
+        }
+
+        string text;
+        try
+        {
+            text = File.ReadAllText(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _dialogs.ShowError("Импорт CSV", $"Не удалось прочитать файл:\n{path}\n\n{ex.Message}");
+            return;
+        }
+
+        Dictionary<string, long> accountsByName = _accounts.ListAll()
+            .ToDictionary(a => a.Name, a => a.Id);
+        Dictionary<string, IReadOnlyList<long>> categoriesByName = _categories.ListAll()
+            .GroupBy(c => c.Name)
+            .ToDictionary(g => g.Key, g => (IReadOnlyList<long>)g.Select(c => c.Id).ToList());
+
+        CsvValidationResult result = CsvValidator.Validate(text, accountsByName, categoriesByName);
+
+        var skipped = new List<CsvSkippedLine>(result.Skipped);
+        int imported = 0;
+        foreach (ParsedCsvLine line in result.Valid)
+        {
+            try
+            {
+                _transactions.Add(line.AccountId, line.CategoryId, line.AmountKopecks, line.Date, line.Comment);
+                imported++;
+            }
+            catch (DbUpdateException)
+            {
+                // Строка прошла проверку, но база отказала — попадает
+                // в пропущенные с причиной, импорт продолжается.
+                skipped.Add(new CsvSkippedLine(line.LineNumber, string.Empty, "не сохранена: база отказала"));
+            }
+        }
+
+        _dialogs.ShowCsvImportReport(CsvExchange.BuildImportReport(imported, skipped));
         Reload();
     }
 
@@ -493,14 +596,6 @@ public sealed class MainViewModel : ViewModelBase
 
     private static bool TryParseDate(string text, out DateOnly date) =>
         DateOnly.TryParseExact(text, "dd.MM.yyyy", Russian, DateTimeStyles.None, out date);
-
-    private static string FormatDate(DateOnly date) => date.ToString("dd.MM.yyyy", Russian);
-
-    private static string TitleOf(int year, int month)
-    {
-        string title = new DateTime(year, month, 1).ToString("MMMM yyyy", Russian);
-        return char.ToUpper(title[0], CultureInfo.CurrentCulture) + title[1..];
-    }
 
     /// <summary>Вариант фильтра категории; Id = null означает «все категории».</summary>
     public sealed record FilterCategoryOption(long? Id, string Display);

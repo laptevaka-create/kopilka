@@ -76,6 +76,51 @@ public sealed class WpfDialogService : IDialogService
         window.ShowDialog();
     }
 
+    public void ShowMonthReport(string month)
+    {
+        int year = int.Parse(month[..4]);
+        int monthNumber = int.Parse(month[5..7]);
+        var viewModel = new ReportViewModel(_transactions, _categories, year, monthNumber);
+        var window = new ReportWindow(viewModel)
+        {
+            Owner = Application.Current?.MainWindow,
+        };
+        window.ShowDialog();
+    }
+
+    public string? AskCsvExportPath(string monthKey)
+    {
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Filter = "CSV-файлы (*.csv)|*.csv|Все файлы (*.*)|*.*",
+            FileName = $"kopilka-{monthKey}.csv",
+        };
+
+        return dialog.ShowDialog() == true ? dialog.FileName : null;
+    }
+
+    public string? AskCsvImportPath()
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Filter = "CSV-файлы (*.csv)|*.csv|Все файлы (*.*)|*.*",
+        };
+
+        return dialog.ShowDialog() == true ? dialog.FileName : null;
+    }
+
+    public void ShowCsvImportReport(string report)
+    {
+        var window = new CsvImportReportWindow(report)
+        {
+            Owner = Application.Current?.MainWindow,
+        };
+        window.ShowDialog();
+    }
+
+    public void ShowError(string title, string message) =>
+        MessageBox.Show(message, title, MessageBoxButton.OK, MessageBoxImage.Error);
+
     public bool Confirm(string title, string message) =>
         MessageBox.Show(
             message,

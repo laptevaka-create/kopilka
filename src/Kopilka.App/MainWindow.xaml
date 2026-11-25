@@ -8,38 +8,51 @@
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
     </Window.Resources>
     <DockPanel>
-        <!-- Шапка: выбор месяца и действия -->
+        <!-- Шапка: выбор месяца, действия с журналом и обмен -->
         <Border DockPanel.Dock="Top" Background="#F5F5F5" Padding="10,6">
-            <DockPanel>
-                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+            <StackPanel>
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                        <Button Content="Изменить"
+                                Command="{Binding EditTransactionCommand}"
+                                MinWidth="100" Padding="12,4" Margin="0,0,8,0" />
+                        <Button Content="Удалить"
+                                Command="{Binding DeleteTransactionCommand}"
+                                MinWidth="100" Padding="12,4" Margin="0,0,8,0" />
+                        <Button Content="Добавить"
+                                Command="{Binding AddTransactionCommand}"
+                                MinWidth="110" Padding="14,4" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Content="‹" Command="{Binding PreviousMonthCommand}"
+                                Width="34" FontSize="16" Padding="0,2" />
+                        <TextBlock Text="{Binding MonthTitle}"
+                                   FontSize="16" FontWeight="SemiBold"
+                                   VerticalAlignment="Center"
+                                   Margin="14,0" MinWidth="150"
+                                   TextAlignment="Center" />
+                        <Button Content="›" Command="{Binding NextMonthCommand}"
+                                Width="34" FontSize="16" Padding="0,2" />
+                    </StackPanel>
+                </DockPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
                     <Button Content="Категории"
                             Command="{Binding ShowCategoriesCommand}"
-                            MinWidth="100" Padding="12,4" Margin="0,0,8,0" />
+                            MinWidth="100" Padding="12,3" Margin="0,0,8,0" />
                     <Button Content="Бюджеты"
                             Command="{Binding ShowBudgetsCommand}"
-                            MinWidth="100" Padding="12,4" Margin="0,0,8,0" />
-                    <Button Content="Изменить"
-                            Command="{Binding EditTransactionCommand}"
-                            MinWidth="100" Padding="12,4" Margin="0,0,8,0" />
-                    <Button Content="Удалить"
-                            Command="{Binding DeleteTransactionCommand}"
-                            MinWidth="100" Padding="12,4" Margin="0,0,8,0" />
-                    <Button Content="Добавить"
-                            Command="{Binding AddTransactionCommand}"
-                            MinWidth="110" Padding="14,4" />
+                            MinWidth="100" Padding="12,3" Margin="0,0,8,0" />
+                    <Button Content="Отчёт"
+                            Command="{Binding ShowReportCommand}"
+                            MinWidth="100" Padding="12,3" Margin="0,0,8,0" />
+                    <Button Content="Экспорт CSV"
+                            Command="{Binding ExportCsvCommand}"
+                            Padding="12,3" Margin="0,0,8,0" />
+                    <Button Content="Импорт CSV"
+                            Command="{Binding ImportCsvCommand}"
+                            Padding="12,3" />
                 </StackPanel>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                    <Button Content="‹" Command="{Binding PreviousMonthCommand}"
-                            Width="34" FontSize="16" Padding="0,2" />
-                    <TextBlock Text="{Binding MonthTitle}"
-                               FontSize="16" FontWeight="SemiBold"
-                               VerticalAlignment="Center"
-                               Margin="14,0" MinWidth="150"
-                               TextAlignment="Center" />
-                    <Button Content="›" Command="{Binding NextMonthCommand}"
-                            Width="34" FontSize="16" Padding="0,2" />
-                </StackPanel>
-            </DockPanel>
+            </StackPanel>
         </Border>
 
         <!-- Фильтры: категория и произвольный период -->

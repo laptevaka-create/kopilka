@@ -280,6 +280,39 @@ internal sealed class FakeDialogService : IDialogService
     /// <summary>Месяц, с которым последний раз открывали окно бюджетов.</summary>
     public string? LastBudgetsMonth { get; private set; }
 
+    /// <summary>Сколько раз открывалось окно отчёта месяца.</summary>
+    public int ReportShownCount { get; private set; }
+
+    /// <summary>Месяц, с которым последний раз открывали отчёт.</summary>
+    public string? LastReportMonth { get; private set; }
+
+    /// <summary>
+    /// Путь, который «выбирает» пользователь для экспорта;
+    /// null — отмена диалога сохранения.
+    /// </summary>
+    public string? ExportPath { get; set; }
+
+    /// <summary>
+    /// Путь, который «выбирает» пользователь для импорта;
+    /// null — отмена диалога открытия.
+    /// </summary>
+    public string? ImportPath { get; set; }
+
+    /// <summary>Сколько раз показывался отчёт импорта CSV.</summary>
+    public int ImportReportShownCount { get; private set; }
+
+    /// <summary>Текст последнего отчёта импорта CSV.</summary>
+    public string? LastImportReport { get; private set; }
+
+    /// <summary>Сколько раз показывалось сообщение об ошибке.</summary>
+    public int ErrorShownCount { get; private set; }
+
+    /// <summary>Заголовок последней ошибки.</summary>
+    public string? LastErrorTitle { get; private set; }
+
+    /// <summary>Текст последней ошибки.</summary>
+    public string? LastErrorMessage { get; private set; }
+
     /// <summary>Идентификатор последней транзакции, переданной в редактирование.</summary>
     public long? LastEditId { get; private set; }
 
@@ -314,6 +347,29 @@ internal sealed class FakeDialogService : IDialogService
     {
         BudgetsShownCount++;
         LastBudgetsMonth = month;
+    }
+
+    public void ShowMonthReport(string month)
+    {
+        ReportShownCount++;
+        LastReportMonth = month;
+    }
+
+    public string? AskCsvExportPath(string monthKey) => ExportPath;
+
+    public string? AskCsvImportPath() => ImportPath;
+
+    public void ShowCsvImportReport(string report)
+    {
+        ImportReportShownCount++;
+        LastImportReport = report;
+    }
+
+    public void ShowError(string title, string message)
+    {
+        ErrorShownCount++;
+        LastErrorTitle = title;
+        LastErrorMessage = message;
     }
 
     public bool Confirm(string title, string message)

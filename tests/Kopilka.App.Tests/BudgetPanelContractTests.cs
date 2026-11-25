@@ -180,6 +180,22 @@ public class BudgetPanelContractTests
         {
         }
 
+        public void ShowMonthReport(string month)
+        {
+        }
+
+        public string? AskCsvExportPath(string monthKey) => null;
+
+        public string? AskCsvImportPath() => null;
+
+        public void ShowCsvImportReport(string report)
+        {
+        }
+
+        public void ShowError(string title, string message)
+        {
+        }
+
         public bool Confirm(string title, string message) => false;
     }
 }
