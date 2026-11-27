@@ -15,6 +15,7 @@ public sealed class WpfDialogService : IDialogService
     private readonly ICategoryRepository _categories;
     private readonly ITransactionRepository _transactions;
     private readonly IBudgetRepository _budgets;
+    private readonly IRecurringPaymentRepository _recurringPayments;
     private readonly IClock _clock;
 
     public WpfDialogService(
@@ -22,12 +23,14 @@ public sealed class WpfDialogService : IDialogService
         ICategoryRepository categories,
         ITransactionRepository transactions,
         IBudgetRepository budgets,
+        IRecurringPaymentRepository recurringPayments,
         IClock clock)
     {
         _accounts = accounts;
         _categories = categories;
         _transactions = transactions;
         _budgets = budgets;
+        _recurringPayments = recurringPayments;
         _clock = clock;
     }
 
@@ -70,6 +73,16 @@ public sealed class WpfDialogService : IDialogService
     {
         var viewModel = new BudgetsViewModel(_categories, _budgets, month);
         var window = new BudgetsWindow(viewModel)
+        {
+            Owner = Application.Current?.MainWindow,
+        };
+        window.ShowDialog();
+    }
+
+    public void ShowRecurring()
+    {
+        var viewModel = new RecurringViewModel(_categories, _accounts, _recurringPayments);
+        var window = new RecurringWindow(viewModel)
         {
             Owner = Application.Current?.MainWindow,
         };

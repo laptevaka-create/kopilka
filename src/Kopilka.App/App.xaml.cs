@@ -72,6 +72,8 @@ public partial class App : Application
         services.AddSingleton<ICategoryRepository, EfCategoryRepository>();
         services.AddSingleton<ITransactionRepository, EfTransactionRepository>();
         services.AddSingleton<IBudgetRepository, EfBudgetRepository>();
+        services.AddSingleton<IRecurringPaymentRepository, EfRecurringPaymentRepository>();
+        services.AddSingleton<IRecurringAccruer, RecurringAccruer>();
         services.AddSingleton<IDialogService, WpfDialogService>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainWindow>();

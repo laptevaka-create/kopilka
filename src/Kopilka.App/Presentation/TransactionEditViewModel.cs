@@ -14,8 +14,8 @@ public sealed class TransactionEditViewModel : ViewModelBase
     private readonly ITransactionRepository _transactions;
     private readonly IClock _clock;
 
-    private AccountOption? _selectedAccount;
-    private CategoryOption? _selectedCategory;
+    private AccountPick? _selectedAccount;
+    private CategoryPick? _selectedCategory;
     private DateTime? _selectedDate;
     private string _amountText = string.Empty;
     private string _commentText = string.Empty;
@@ -33,10 +33,10 @@ public sealed class TransactionEditViewModel : ViewModelBase
         _clock = clock;
 
         Accounts = accounts.ListAll()
-            .Select(a => new AccountOption(a.Id, a.Name))
+            .Select(a => new AccountPick(a.Id, a.Name))
             .ToList();
         Categories = categories.ListAll()
-            .Select(c => new CategoryOption(c.Id, c.Name, c.Kind))
+            .Select(c => new CategoryPick(c.Id, c.Name, c.Kind))
             .ToList();
 
         SelectedAccount = Accounts.FirstOrDefault();
@@ -54,18 +54,18 @@ public sealed class TransactionEditViewModel : ViewModelBase
     public bool IsEditing => _editingId is not null;
 
     /// <summary>Счета для выбора.</summary>
-    public IReadOnlyList<AccountOption> Accounts { get; }
+    public IReadOnlyList<AccountPick> Accounts { get; }
 
     /// <summary>Категории для выбора, с пометкой типа.</summary>
-    public IReadOnlyList<CategoryOption> Categories { get; }
+    public IReadOnlyList<CategoryPick> Categories { get; }
 
-    public AccountOption? SelectedAccount
+    public AccountPick? SelectedAccount
     {
         get => _selectedAccount;
         set => SetProperty(ref _selectedAccount, value);
     }
 
-    public CategoryOption? SelectedCategory
+    public CategoryPick? SelectedCategory
     {
         get => _selectedCategory;
         set => SetProperty(ref _selectedCategory, value);
@@ -112,7 +112,7 @@ public sealed class TransactionEditViewModel : ViewModelBase
         SelectedCategory = Categories.FirstOrDefault(c => c.Id == transaction.CategoryId);
         SelectedDate = transaction.Date.ToDateTime(TimeOnly.MinValue);
         // В поле ввода — сумма без символа валюты, как её вводит пользователь.
-        AmountText = (transaction.AmountKopecks / 100m).ToString("0.00", new CultureInfo("ru-RU"));
+        AmountText = MoneyText.ForInput(transaction.AmountKopecks);
         CommentText = transaction.Comment ?? string.Empty;
         ValidationSummary = string.Empty;
     }
@@ -218,15 +218,5 @@ public sealed class TransactionEditViewModel : ViewModelBase
     {
         MoneyText.TryParseRubles(text, out long kopecks, out _);
         return kopecks;
-    }
-
-    /// <summary>Вариант счёта для выпадающего списка.</summary>
-    public sealed record AccountOption(long Id, string Name);
-
-    /// <summary>Вариант категории для выпадающего списка, с типом.</summary>
-    public sealed record CategoryOption(long Id, string Name, Kopilka.Core.Domain.CategoryKind Kind)
-    {
-        /// <summary>Подпись в списке: «Продукты (расход)».</summary>
-        public string Display => $"{Name} ({(Kind == Kopilka.Core.Domain.CategoryKind.Income ? "доход" : "расход")})";
     }
 }

@@ -23,6 +23,7 @@ public class JournalFilterContractTests
             Fakes.Accounts(),
             categories,
             Fakes.Budgets(),
+            Fakes.Accruer(),
             dialog,
             Fakes.Clock());
         return (viewModel, transactions, categories, dialog);

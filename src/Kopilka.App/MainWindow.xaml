@@ -42,6 +42,9 @@
                     <Button Content="Бюджеты"
                             Command="{Binding ShowBudgetsCommand}"
                             MinWidth="100" Padding="12,3" Margin="0,0,8,0" />
+                    <Button Content="Регулярные"
+                            Command="{Binding ShowRecurringCommand}"
+                            MinWidth="100" Padding="12,3" Margin="0,0,8,0" />
                     <Button Content="Отчёт"
                             Command="{Binding ShowReportCommand}"
                             MinWidth="100" Padding="12,3" Margin="0,0,8,0" />

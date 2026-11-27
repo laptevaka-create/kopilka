@@ -24,6 +24,9 @@ public interface IDialogService
     /// <summary>Показывает окно бюджетов на указанный месяц («ГГГГ-ММ»).</summary>
     void ShowBudgets(string month);
 
+    /// <summary>Показывает окно шаблонов регулярных платежей.</summary>
+    void ShowRecurring();
+
     /// <summary>Показывает окно отчёта указанного месяца («ГГГГ-ММ»).</summary>
     void ShowMonthReport(string month);
 

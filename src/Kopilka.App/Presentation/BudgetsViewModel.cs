@@ -51,7 +51,7 @@ public sealed class BudgetsViewModel : ViewModelBase
             if (SetProperty(ref _selectedItem, value))
             {
                 LimitText = value?.LimitKopecks is long kopecks
-                    ? (kopecks / 100m).ToString("0.00", new System.Globalization.CultureInfo("ru-RU"))
+                    ? MoneyText.ForInput(kopecks)
                     : string.Empty;
                 SaveLimitCommand.RaiseCanExecuteChanged();
                 RemoveLimitCommand.RaiseCanExecuteChanged();

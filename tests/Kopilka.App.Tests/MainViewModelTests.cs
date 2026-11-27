@@ -17,6 +17,7 @@ public class MainViewModelTests
             Fakes.Accounts(),
             Fakes.Categories(),
             Fakes.Budgets(),
+            Fakes.Accruer(),
             dialog,
             clockMoment is null ? Fakes.Clock() : Fakes.Clock(clockMoment.Value));
         return (viewModel, transactions, dialog);
@@ -143,7 +144,7 @@ public class MainViewModelTests
     {
         FakeTransactionRepository transactions = Fakes.Transactions();
         var dialog = new RecordingDialog(transactions);
-        var viewModel = new MainViewModel(transactions, Fakes.Accounts(), Fakes.Categories(), Fakes.Budgets(), dialog, Fakes.Clock());
+        var viewModel = new MainViewModel(transactions, Fakes.Accounts(), Fakes.Categories(), Fakes.Budgets(), Fakes.Accruer(), dialog, Fakes.Clock());
 
         viewModel.AddTransactionCommand.Execute(null);
 
@@ -157,7 +158,7 @@ public class MainViewModelTests
         FakeTransactionRepository transactions = Fakes.Transactions();
         transactions.Add(1, 3, 500_00, new DateOnly(2026, 11, 5), null);
         FakeDialogService dialog = Fakes.Dialog(result: false);
-        var viewModel = new MainViewModel(transactions, Fakes.Accounts(), Fakes.Categories(), Fakes.Budgets(), dialog, Fakes.Clock());
+        var viewModel = new MainViewModel(transactions, Fakes.Accounts(), Fakes.Categories(), Fakes.Budgets(), Fakes.Accruer(), dialog, Fakes.Clock());
 
         viewModel.AddTransactionCommand.Execute(null);
 
@@ -181,6 +182,10 @@ public class MainViewModelTests
         }
 
         public void ShowBudgets(string month)
+        {
+        }
+
+        public void ShowRecurring()
         {
         }
 

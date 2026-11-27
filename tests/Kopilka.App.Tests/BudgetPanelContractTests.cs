@@ -25,6 +25,7 @@ public class BudgetPanelContractTests
             Fakes.Accounts(),
             categories,
             budgets,
+            Fakes.Accruer(),
             dialog,
             clockMoment is null ? Fakes.Clock() : Fakes.Clock(clockMoment.Value));
         return (viewModel, transactions, categories, budgets, dialog);
@@ -101,6 +102,7 @@ public class BudgetPanelContractTests
             Fakes.Accounts(),
             Fakes.Categories(),
             budgets,
+            Fakes.Accruer(),
             new AddTransactionDialog(transactions),
             Fakes.Clock());
 
@@ -177,6 +179,10 @@ public class BudgetPanelContractTests
         }
 
         public void ShowBudgets(string month)
+        {
+        }
+
+        public void ShowRecurring()
         {
         }
 

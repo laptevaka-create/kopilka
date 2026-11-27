@@ -41,6 +41,7 @@ public class MainViewModelCsvTests : IDisposable
             Fakes.Accounts(),
             Fakes.Categories(),
             Fakes.Budgets(),
+            Fakes.Accruer(),
             dialog,
             Fakes.Clock());
         return (viewModel, transactions, dialog);

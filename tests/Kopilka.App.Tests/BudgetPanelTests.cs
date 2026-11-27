@@ -23,6 +23,7 @@ public class BudgetPanelTests
             Fakes.Accounts(),
             Fakes.Categories(),
             budgets,
+            Fakes.Accruer(),
             dialog,
             clockMoment is null ? Fakes.Clock() : Fakes.Clock(clockMoment.Value));
         return (viewModel, transactions, budgets, dialog);

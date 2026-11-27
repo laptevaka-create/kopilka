@@ -25,6 +25,8 @@ internal static class Fakes
 
     public static FakeBudgetRepository Budgets() => new();
 
+    public static FakeRecurringAccruer Accruer() => new();
+
     /// <summary>Сервис диалогов, всегда отвечающий заданным результатом.</summary>
     public static FakeDialogService Dialog(bool result) => new(result);
 }
@@ -349,6 +351,14 @@ internal sealed class FakeDialogService : IDialogService
         LastBudgetsMonth = month;
     }
 
+    /// <summary>Сколько раз открывалось окно регулярных платежей.</summary>
+    public int RecurringShownCount { get; private set; }
+
+    public void ShowRecurring()
+    {
+        RecurringShownCount++;
+    }
+
     public void ShowMonthReport(string month)
     {
         ReportShownCount++;
@@ -376,5 +386,32 @@ internal sealed class FakeDialogService : IDialogService
     {
         LastConfirmMessage = message;
         return ConfirmResult;
+    }
+}
+
+/// <summary>
+/// Фейк начислителя: ничего не создаёт, но фиксирует вызовы —
+/// «до какой даты» и «сколько раз».
+/// </summary>
+internal sealed class FakeRecurringAccruer : IRecurringAccruer
+{
+    /// <summary>Сколько раз вызывалось начисление.</summary>
+    public int Calls { get; private set; }
+
+    /// <summary>Нижняя граница последнего вызова (сегодня для новых шаблонов).</summary>
+    public DateOnly? LastToday { get; private set; }
+
+    /// <summary>Верхняя граница последнего вызова (до какой даты начислять).</summary>
+    public DateOnly? LastToDate { get; private set; }
+
+    /// <summary>Число, которое начисление «создало».</summary>
+    public int Result { get; set; }
+
+    public int AccrueUpTo(DateOnly today, DateOnly toDate)
+    {
+        Calls++;
+        LastToday = today;
+        LastToDate = toDate;
+        return Result;
     }
 }

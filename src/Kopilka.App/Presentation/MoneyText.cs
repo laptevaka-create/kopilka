@@ -27,6 +27,10 @@ public static class MoneyText
         return sign + Format(kopecks);
     }
 
+    /// <summary>Сумма для поля ввода: «1234,56» — без пробелов и символа валюты.</summary>
+    public static string ForInput(long kopecks) =>
+        (kopecks / 100m).ToString("0.00", Russian);
+
     /// <summary>
     /// Разбор суммы, как её вводит пользователь. Правила — в Core
     /// (<see cref="MoneyParser"/>): их используют и интерфейс, и CSV.

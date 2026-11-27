@@ -25,6 +25,7 @@ public sealed class MainViewModel : ViewModelBase
     private readonly IAccountRepository _accounts;
     private readonly ICategoryRepository _categories;
     private readonly IBudgetRepository _budgets;
+    private readonly IRecurringAccruer _recurringAccruer;
     private readonly IDialogService _dialogs;
     private readonly IClock _clock;
 
@@ -48,6 +49,7 @@ public sealed class MainViewModel : ViewModelBase
         IAccountRepository accounts,
         ICategoryRepository categories,
         IBudgetRepository budgets,
+        IRecurringAccruer recurringAccruer,
         IDialogService dialogs,
         IClock clock)
     {
@@ -55,6 +57,7 @@ public sealed class MainViewModel : ViewModelBase
         _accounts = accounts;
         _categories = categories;
         _budgets = budgets;
+        _recurringAccruer = recurringAccruer;
         _dialogs = dialogs;
         _clock = clock;
 
@@ -69,6 +72,7 @@ public sealed class MainViewModel : ViewModelBase
         DeleteTransactionCommand = new RelayCommand(DeleteTransaction, () => SelectedTransaction is not null);
         ShowCategoriesCommand = new RelayCommand(ShowCategories);
         ShowBudgetsCommand = new RelayCommand(ShowBudgets, () => !IsCustomPeriod);
+        ShowRecurringCommand = new RelayCommand(ShowRecurring);
         ShowReportCommand = new RelayCommand(ShowMonthReport, () => !IsCustomPeriod);
         ExportCsvCommand = new RelayCommand(ExportCsv, () => !IsCustomPeriod);
         ImportCsvCommand = new RelayCommand(ImportCsv);
@@ -77,6 +81,11 @@ public sealed class MainViewModel : ViewModelBase
 
         _year = clock.Now.Year;
         _month = clock.Now.Month;
+
+        // Запуск программы: начисления по активным шаблонам за
+        // пропущенные даты — до сегодняшнего дня включительно.
+        DateOnly today = DateOnly.FromDateTime(_clock.Now.Date);
+        _recurringAccruer.AccrueUpTo(today, today);
 
         RebuildFilterCategories();
         Reload();
@@ -231,6 +240,8 @@ public sealed class MainViewModel : ViewModelBase
 
     public RelayCommand ShowBudgetsCommand { get; }
 
+    public RelayCommand ShowRecurringCommand { get; }
+
     public RelayCommand ShowReportCommand { get; }
 
     public RelayCommand ExportCsvCommand { get; }
@@ -371,6 +382,9 @@ public sealed class MainViewModel : ViewModelBase
             _year--;
         }
 
+        // Открытие месяца: начисления по активным шаблонам до конца
+        // показанного месяца включительно.
+        AccrueForShownMonth();
         Reload();
     }
 
@@ -383,8 +397,15 @@ public sealed class MainViewModel : ViewModelBase
             _year++;
         }
 
+        AccrueForShownMonth();
         Reload();
     }
+
+    /// <summary>Начисляет по шаблонам до конца показанного месяца.</summary>
+    private void AccrueForShownMonth() =>
+        _recurringAccruer.AccrueUpTo(
+            DateOnly.FromDateTime(_clock.Now.Date),
+            new DateOnly(_year, _month, DateTime.DaysInMonth(_year, _month)));
 
     private void AddTransaction()
     {
@@ -444,6 +465,16 @@ public sealed class MainViewModel : ViewModelBase
         // Окно редактирует бюджеты показанного месяца; после закрытия
         // панель перечитывается.
         _dialogs.ShowBudgets(MonthKey());
+        Reload();
+    }
+
+    private void ShowRecurring()
+    {
+        _dialogs.ShowRecurring();
+
+        // В окне могли завести новые шаблоны: их предстоящие даты
+        // показанного месяца начисляются сразу, журнал перечитывается.
+        AccrueForShownMonth();
         Reload();
     }
 

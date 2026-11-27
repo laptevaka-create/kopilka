@@ -75,7 +75,7 @@ public class ReportViewModelContractTests
         // Журнал сужен фильтром по «Транспорту».
         var main = new MainViewModel(
             transactions, Fakes.Accounts(), categories, Fakes.Budgets(),
-            Fakes.Dialog(result: false), Fakes.Clock());
+            Fakes.Accruer(), Fakes.Dialog(result: false), Fakes.Clock());
         main.SelectedFilterCategory = main.FilterCategories.First(c => c.Id == 4);
         Assert.Single(main.Transactions);
 
